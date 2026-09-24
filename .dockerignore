@@ -1,0 +1,12 @@
+node_modules
+build
+dist
+apps/web/dist
+apps/server/data
+apps/api
+.git
+.playwright-mcp
+.env
+.env.*
+!.env.example
+*.log

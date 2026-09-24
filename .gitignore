@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.DS_Store
+.playwright-mcp
+apps/api/data/
+apps/server/data/

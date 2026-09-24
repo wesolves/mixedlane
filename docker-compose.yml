@@ -1,0 +1,105 @@
+# Flowboard production stack
+#
+#   web  (nginx)     :8080 → published on HOST_PORT — the UI, and a reverse proxy for everything below
+#   api  (Node)      REST API, MCP server (/api/mcp), realtime socket (/api/socket), jobs, agent plugins
+#   db   (Postgres)  data; migrations run automatically when the api starts
+#   minio (optional) S3-compatible uploads — enable with `--profile s3`
+#
+#   cp .env.example .env            # set POSTGRES_PASSWORD, JWT_SECRET, SECRET_KEY, APP_URL
+#   docker compose up -d --build
+#   docker compose --profile s3 up -d --build      # with MinIO for uploads
+#
+# Only `web` is exposed; api and db are reachable only on the internal network.
+
+name: flowboard
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  db:
+    <<: *restart
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: flowboard
+      POSTGRES_USER: flowboard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowboard -d flowboard"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    <<: *restart
+    build:
+      context: .
+      target: api
+    image: flowboard-api:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://flowboard:${POSTGRES_PASSWORD}@db:5432/flowboard
+      # One proxy hop (the web container). Use 2 if another TLS proxy / load balancer sits in front.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+    volumes:
+      - uploads:/data
+    expose:
+      - "3000"
+
+  web:
+    <<: *restart
+    build:
+      context: .
+      target: web
+    image: flowboard-web:latest
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_UPSTREAM: api:3000
+    ports:
+      - "${HOST_PORT:-3000}:8080"
+
+  # --- Optional: S3-compatible storage for uploads (enable with --profile s3) ---
+  minio:
+    <<: *restart
+    profiles: ["s3"]
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-flowboard}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-flowboard-secret}
+    ports:
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio-init:
+    profiles: ["s3"]
+    # The MinIO server image ships the `mc` client too.
+    image: quay.io/minio/minio:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "mc alias set local http://minio:9000 $${MINIO_USER} $${MINIO_PASSWORD} &&
+                  mc mb --ignore-existing local/$${BUCKET}"
+    environment:
+      MINIO_USER: ${S3_ACCESS_KEY_ID:-flowboard}
+      MINIO_PASSWORD: ${S3_SECRET_ACCESS_KEY:-flowboard-secret}
+      BUCKET: ${S3_BUCKET:-flowboard}
+
+volumes:
+  pgdata:
+  uploads:
+  minio:

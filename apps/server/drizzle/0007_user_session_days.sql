@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "session_days" integer DEFAULT 30 NOT NULL;

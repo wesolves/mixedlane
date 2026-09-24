@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "can_create_projects" boolean DEFAULT true NOT NULL;

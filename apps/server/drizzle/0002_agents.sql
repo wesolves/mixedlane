@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "doc_access" text DEFAULT 'read' NOT NULL;

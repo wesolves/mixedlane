@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "planning_mode" text DEFAULT 'auto' NOT NULL;
