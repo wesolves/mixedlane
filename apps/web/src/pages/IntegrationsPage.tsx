@@ -71,13 +71,11 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean }) {
   if (embedded) return body;
   return (
     <div className="flex-1 overflow-y-auto">
-      <header className="border-b">
-        <div className="mx-auto w-full max-w-5xl px-6 py-5">
-          <h1 className="text-lg font-semibold tracking-tight">Integrations</h1>
-          <p className="text-sm text-muted-foreground">Connect tools once for the whole organization, then link them per project.</p>
-        </div>
+      <header className="border-b px-6 py-5">
+        <h1 className="text-lg font-semibold tracking-tight">Integrations</h1>
+        <p className="text-sm text-muted-foreground">Connect tools once for the whole organization, then link them per project.</p>
       </header>
-      <div className="mx-auto w-full max-w-5xl px-6 py-8">{body}</div>
+      <div className="px-6 py-6">{body}</div>
     </div>
   );
 }

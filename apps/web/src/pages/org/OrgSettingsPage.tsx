@@ -39,27 +39,25 @@ export function OrgSettingsPage() {
   if (!tabs.some((t) => t.id === tab)) return <Navigate to={paths.orgSettings()} replace />;
   return (
     <div className="flex-1 overflow-y-auto">
-      <header className="border-b">
-        <div className="mx-auto w-full max-w-5xl px-6 pt-6">
-          <h1 className="text-xl font-semibold tracking-tight">{org?.name} settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Members, teams, AI agents and integrations for the whole organization.</p>
-          <nav className="-mx-3 mt-5 flex flex-wrap gap-x-1">
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <Link
-                key={id}
-                to={paths.orgSettings(id)}
-                className={cn(
-                  "-mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 pb-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground",
-                  tab === id && "border-primary font-medium text-foreground",
-                )}
-              >
-                <Icon className="size-4" /> {label}
-              </Link>
-            ))}
-          </nav>
-        </div>
+      <header className="border-b px-6 pt-5">
+        <h1 className="text-lg font-semibold tracking-tight">{org?.name} settings</h1>
+        <p className="text-sm text-muted-foreground">Members, teams, AI agents and integrations for the whole organization.</p>
+        <nav className="mt-4 flex flex-wrap gap-x-1">
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <Link
+              key={id}
+              to={paths.orgSettings(id)}
+              className={cn(
+                "-mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 pb-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground",
+                tab === id && "border-primary font-medium text-foreground",
+              )}
+            >
+              <Icon className="size-4" /> {label}
+            </Link>
+          ))}
+        </nav>
       </header>
-      <main className="mx-auto w-full max-w-5xl px-6 py-8">
+      <main className="px-6 py-6">
         {tab === "general" && <GeneralTab />}
         {tab === "members" && <MembersTab />}
         {tab === "teams" && <TeamsTab />}
@@ -113,7 +111,7 @@ function GeneralTab() {
   });
 
   return (
-    <div className="divide-y">
+    <div className="max-w-[66.5rem] divide-y">
       <SettingsRow title="Organization" description="The name and web address everyone in the organization sees.">
         <section className="space-y-4 rounded-xl border bg-card p-5">
           <div className="grid gap-1.5">
@@ -183,7 +181,7 @@ function GeneralTab() {
 /** A settings group: title and help text on the left, its controls on the right (stacked on small screens). */
 function SettingsRow({ title, description, danger, children }: { title: string; description: string; danger?: boolean; children: ReactNode }) {
   return (
-    <div className="grid gap-4 py-8 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] md:gap-10">
+    <div className="grid gap-4 py-8 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,16rem)_minmax(0,48rem)] md:gap-10">
       <div>
         <h2 className={cn("font-semibold", danger && "text-destructive")}>{title}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
