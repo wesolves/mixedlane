@@ -413,56 +413,92 @@ function TeamsTab() {
   const { can } = useOrg();
   const { data: teams, isLoading } = useQuery({ queryKey: ["org", "teams"], queryFn: api.orgs.teams });
   const { data: members = [] } = useQuery({ queryKey: ["org", "members"], queryFn: api.orgs.members });
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [creating, setCreating] = useState(false);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["org"] });
-  const create = useMutation({
-    mutationFn: () => api.orgs.createTeam(name.trim(), description.trim()),
-    onSuccess: () => {
-      setName("");
-      setDescription("");
-      invalidate();
-    },
-    onError,
-  });
   const manage = can("team.manage");
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">Teams group people so you can give them access to projects together.</p>
-      {manage && (
-        <form
-          className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (name.trim()) create.mutate();
-          }}
-        >
-          <div className="grid min-w-48 flex-1 gap-1.5">
-            <Label htmlFor="team-name">New team</Label>
-            <Input id="team-name" placeholder="e.g. Mobile" value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="grid min-w-64 flex-[2] gap-1.5">
-            <Label htmlFor="team-desc">Description</Label>
-            <Textarea id="team-desc" rows={1} className="min-h-9" value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <Button type="submit" disabled={!name.trim() || create.isPending}>
-            <Plus className="size-4" /> Create
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-sm text-muted-foreground">
+          {teams?.length ?? 0} {teams?.length === 1 ? "team" : "teams"} · Teams group people so you can give them access to projects together.
+        </p>
+        {manage && (
+          <Button onClick={() => setCreating(true)}>
+            <Plus className="size-4" /> New team
           </Button>
-        </form>
-      )}
+        )}
+      </div>
       {isLoading ? (
-        <Skeleton className="h-40" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-48 rounded-xl" />
+          ))}
+        </div>
       ) : !teams?.length ? (
-        <EmptyState icon={<Users className="size-5" />} title="No teams yet" description="Create a team, add people, then grant it access to projects." />
+        <EmptyState
+          icon={<Users className="size-5" />}
+          title="No teams yet"
+          description="Create a team, add people, then grant it access to projects."
+          action={manage && <Button onClick={() => setCreating(true)}>Create your first team</Button>}
+        />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {teams.map((t) => (
             <TeamCard key={t.id} team={t} members={members} manage={manage} onChange={invalidate} />
           ))}
         </div>
       )}
+      {creating && <NewTeamDialog onClose={() => setCreating(false)} onCreated={invalidate} />}
     </div>
+  );
+}
+
+function NewTeamDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const create = useMutation({
+    mutationFn: () => api.orgs.createTeam(name.trim(), description.trim()),
+    onSuccess: () => {
+      onCreated();
+      toast.success(`Team ${name.trim()} created`);
+      onClose();
+    },
+    onError,
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>New team</DialogTitle>
+          <DialogDescription>Add people afterwards, then grant the team access to projects.</DialogDescription>
+        </DialogHeader>
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) create.mutate();
+          }}
+        >
+          <div className="grid gap-1.5">
+            <Label htmlFor="team-name">Name</Label>
+            <Input id="team-name" autoFocus placeholder="e.g. Mobile" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="team-desc">Description (optional)</Label>
+            <Textarea id="team-desc" rows={3} placeholder="What does this team work on?" value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!name.trim() || create.isPending}>
+              <Plus className="size-4" /> Create team
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
