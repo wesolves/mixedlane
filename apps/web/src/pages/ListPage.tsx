@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown, Search } from "lucide-react";
-import { TYPE_LABELS, defaultChildType, type WorkItemSummary } from "@flowboard/shared";
+import { TYPE_LABELS, defaultChildType, type WorkItemSummary } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState, PriorityIcon, ProgressBar, TypeIcon, UserAvatar } from "@/components/common";

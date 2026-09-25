@@ -11,7 +11,7 @@ import {
   resetPasswordSchema,
   updateProfileSchema,
   verifyEmailSchema,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { config, secureCookies } from "../../core/config";
 import { Auth, NoOrg, Public, type AuthInfo } from "../../core/context";
 import { AppError } from "../../core/http";
@@ -20,8 +20,8 @@ import { OrgsService } from "../orgs/orgs.service";
 import { AuthService, type IssuedSession, type SessionMeta } from "./auth.service";
 import { signFileToken } from "./crypto";
 
-export const REFRESH_COOKIE = "fb_rt";
-export const FILE_COOKIE = "fb_file";
+export const REFRESH_COOKIE = "ml_rt";
+export const FILE_COOKIE = "ml_file";
 
 const meta = (req: Request): SessionMeta => ({ userAgent: req.header("user-agent"), ip: req.ip });
 
@@ -72,7 +72,7 @@ export class AuthController {
   @Public()
   @Post("refresh")
   @HttpCode(200)
-  @ApiOperation({ summary: "Exchange the refresh cookie for a new access token (send X-Requested-With: flowboard)" })
+  @ApiOperation({ summary: "Exchange the refresh cookie for a new access token (send X-Requested-With: mixedlane)" })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     if (!req.header("x-requested-with")) throw new AppError(400, "Missing X-Requested-With header");
     // No cookie = simply signed out (every page load asks); answer quietly instead of 401.

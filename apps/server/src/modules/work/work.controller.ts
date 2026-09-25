@@ -16,7 +16,7 @@ import {
   type ProjectCreate,
   type ProjectRole,
   type ProjectUpdate,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { Ctx, type RequestContext } from "../../core/context";
 import { AppError } from "../../core/http";
 import { ZBody } from "../../core/zod-body";

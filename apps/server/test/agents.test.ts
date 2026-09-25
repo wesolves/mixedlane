@@ -53,7 +53,7 @@ describe("agent management", () => {
     expect(res.status).toBe(201);
     agentId = res.body.agent.id;
     secret = res.body.key.secret;
-    expect(secret).toMatch(/^fb_[0-9a-f]{12}_[A-Za-z0-9_-]{43}$/);
+    expect(secret).toMatch(/^ml_[0-9a-f]{12}_[A-Za-z0-9_-]{43}$/);
     expect(res.body.key.key.prefix).toBe(secret.slice(0, 15));
 
     const list = (await owner.api(org).get("/api/agents")).body;
@@ -90,7 +90,7 @@ describe("API key authentication", () => {
     expect((await asAgent().get("/api/agents")).status).toBe(403);
     expect((await asAgent().post("/api/org/invites").send({ email: "x@y.dev", role: "admin" })).status).toBe(403);
     expect((await asAgent().get("/api/projects").set("x-org", "someone-else")).status).toBe(404);
-    expect((await asAgent("fb_000000000000_" + "a".repeat(43)).get("/api/projects")).status).toBe(401);
+    expect((await asAgent("ml_000000000000_" + "a".repeat(43)).get("/api/projects")).status).toBe(401);
   });
 
   it("revoked keys and disabled agents stop working immediately", async () => {

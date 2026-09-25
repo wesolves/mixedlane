@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { io, type Socket } from "socket.io-client";
 import { toast } from "sonner";
-import type { LiveEvent, PresenceResource, PresenceUser } from "@flowboard/shared";
+import type { LiveEvent, PresenceResource, PresenceUser } from "@mixedlane/shared";
 import { useAuth } from "./auth";
 import { getAccessToken, refreshSession } from "./session";
 

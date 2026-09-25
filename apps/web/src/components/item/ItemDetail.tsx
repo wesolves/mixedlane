@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ChevronRight, Expand, Link2, MoreHorizontal, Plus, Trash2 } from "lucide-react";
-import { TYPE_LABELS, TYPE_PLURALS, childTypes, defaultChildType, type ItemUpdate, type Project, type WorkItemDetail } from "@flowboard/shared";
+import { TYPE_LABELS, TYPE_PLURALS, childTypes, defaultChildType, type ItemUpdate, type Project, type WorkItemDetail } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

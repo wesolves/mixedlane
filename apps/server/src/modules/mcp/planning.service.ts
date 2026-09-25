@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { TYPE_LABELS, allowedParentTypes, canHaveParent, type ItemType, type Priority, type ProjectAccessInfo, type WorkItemSummary } from "@flowboard/shared";
+import { TYPE_LABELS, allowedParentTypes, canHaveParent, type ItemType, type Priority, type ProjectAccessInfo, type WorkItemSummary } from "@mixedlane/shared";
 import { config } from "../../core/config";
 import type { RequestContext } from "../../core/context";
 import { AppError } from "../../core/http";
@@ -38,7 +38,7 @@ export type Stage = "start" | "review" | "done";
 const MAX_ITEMS = 100;
 
 /**
- * Turns an agent's plan into Flowboard work items (idempotently), and moves items through the
+ * Turns an agent's plan into Mixedlane work items (idempotently), and moves items through the
  * workflow as the agent works. Everything goes through ItemsService, so activity, notifications and
  * realtime updates happen exactly as for people.
  */
@@ -56,9 +56,9 @@ export class PlanningService {
     return [
       "",
       `Planning workflow — your planning mode is ${mode.toUpperCase()}:`,
-      "- Whenever you make a plan, break down requirements, or are asked to build something non-trivial, record the work in Flowboard with create_plan:",
+      "- Whenever you make a plan, break down requirements, or are asked to build something non-trivial, record the work in Mixedlane with create_plan:",
       "  epic (the outcome) → milestone (if the project uses them) → user story (user value; acceptance criteria as a `- [ ]` checklist) → task (an implementation step) → subtask.",
-      "  Use only the item types enabled in the project (list_projects / get_project). search_items first and reuse existing items instead of duplicating them. If the repository has a .flowboard.json, use its project.",
+      "  Use only the item types enabled in the project (list_projects / get_project). search_items first and reuse existing items instead of duplicating them. If the repository has a .mixedlane.json, use its project.",
       ctx.agent?.canCreateProjects === false
         ? "- If no existing project fits, you can't create one: ask the user which project to use (an org admin can allow project creation for you in Settings → AI agents)."
         : "- If no existing project fits a new initiative, create one with create_project (short 2-5 letter key, enable only the levels it needs), then plan into it. If it's unclear whether the work belongs in an existing project, ask.",

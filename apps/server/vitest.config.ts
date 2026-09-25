@@ -6,7 +6,7 @@ export default defineConfig({
   // SWC (not esbuild) so Nest's decorator metadata is emitted.
   plugins: [swc.vite({ module: { type: "es6" } })],
   resolve: {
-    alias: { "@flowboard/shared": resolve(__dirname, "../../packages/shared/src/index.ts") },
+    alias: { "@mixedlane/shared": resolve(__dirname, "../../packages/shared/src/index.ts") },
   },
   test: {
     include: ["test/**/*.test.ts"],

@@ -2,7 +2,7 @@
 // layout so paths like apps/server/drizzle keep working:
 //   build/apps/server/src/**.js   build/apps/server/drizzle/   build/packages/shared/src/**.js
 // SWC (not tsc/esbuild) because Nest's dependency injection needs emitted decorator metadata.
-// Imports get explicit .js extensions and the @flowboard/shared alias becomes a relative path.
+// Imports get explicit .js extensions and the @mixedlane/shared alias becomes a relative path.
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,9 +21,9 @@ const walk = (dir) =>
 
 const toPosix = (p) => p.split(sep).join("/");
 
-/** "./foo" → "./foo.js" or "./foo/index.js"; "@flowboard/shared" → relative path to the built package. */
+/** "./foo" → "./foo.js" or "./foo/index.js"; "@mixedlane/shared" → relative path to the built package. */
 function rewrite(spec, srcFile, outFile) {
-  if (spec === "@flowboard/shared") {
+  if (spec === "@mixedlane/shared") {
     let rel = toPosix(relative(dirname(outFile), sharedEntry));
     return rel.startsWith(".") ? rel : `./${rel}`;
   }

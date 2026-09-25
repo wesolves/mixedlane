@@ -1,7 +1,7 @@
 import { Check, UserRound } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { PRIORITIES, PRIORITY_LABELS, TYPE_LABELS, type ItemType, type Priority, type StatusDef } from "@flowboard/shared";
+import { PRIORITIES, PRIORITY_LABELS, TYPE_LABELS, type ItemType, type Priority, type StatusDef } from "@mixedlane/shared";
 import {
   DropdownMenu,
   DropdownMenuContent,

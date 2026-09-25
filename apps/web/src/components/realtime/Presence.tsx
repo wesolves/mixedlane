@@ -1,5 +1,5 @@
 import { Pencil } from "lucide-react";
-import type { PresenceUser } from "@flowboard/shared";
+import type { PresenceUser } from "@mixedlane/shared";
 import { UserAvatar } from "@/components/common";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";

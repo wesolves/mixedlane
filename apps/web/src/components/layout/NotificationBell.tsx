@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { AtSign, Bell, CheckCheck, CircleDot, MessageSquare, UserPlus, type LucideIcon } from "lucide-react";
-import type { Notification } from "@flowboard/shared";
+import type { Notification } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { api } from "@/lib/api";

@@ -10,7 +10,7 @@
     "useDefineForClassFields": false,
     "strictPropertyInitialization": false,
     "baseUrl": ".",
-    "paths": { "@flowboard/shared": ["../../packages/shared/src/index.ts"] }
+    "paths": { "@mixedlane/shared": ["../../packages/shared/src/index.ts"] }
   },
   "include": ["src", "test"]
 }

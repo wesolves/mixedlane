@@ -6,9 +6,9 @@ import { gunzipSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { bootApp, type TestApp } from "./harness";
 
-/** Agent plugins served by Flowboard: bundles per client, installers, and the shared hook script. */
+/** Agent plugins served by Mixedlane: bundles per client, installers, and the shared hook script. */
 let ctx: TestApp;
-const HOST = "flowboard.test:8080";
+const HOST = "mixedlane.test:8080";
 
 /** Lists a ustar archive (name → content). */
 function untar(gz: Buffer) {
@@ -56,7 +56,7 @@ describe("plugin catalogue", () => {
     const sh = (await ctx.http().get("/api/plugins/install.sh").set("host", HOST)).text;
     expect(sh).toContain(`BASE="http://${HOST}"`);
     expect(sh).toContain("claude plugin marketplace add");
-    expect(sh).toContain("codex plugin add flowboard@flowboard");
+    expect(sh).toContain("codex plugin add mixedlane@mixedlane");
     expect(sh).toContain("copilot plugin install");
     const ps = (await ctx.http().get("/api/plugins/install.ps1").set("host", HOST)).text;
     expect(ps).toContain(`$Base = "http://${HOST}"`);
@@ -74,54 +74,54 @@ describe("bundles", () => {
       expect(all, client).not.toMatch(/\{\{[A-Z_]+\}\}/);
       expect(all, client).toContain(MCP);
       const skills = [...files.keys()].filter((k) => k.endsWith("SKILL.md")).map((k) => k.split("/").at(-2)).sort();
-      expect(skills, client).toEqual(["flowboard-docs", "flowboard-init", "flowboard-planning", "flowboard-work-tracking"]);
+      expect(skills, client).toEqual(["mixedlane-docs", "mixedlane-init", "mixedlane-planning", "mixedlane-work-tracking"]);
     }
   });
 
   it("Claude Code: marketplace + plugin with hooks, planner agent and commands", async () => {
     const f = await bundle("claude-code");
-    expect(JSON.parse(f.get(".claude-plugin/marketplace.json")!).plugins[0]).toMatchObject({ name: "flowboard", source: "./flowboard" });
-    expect(JSON.parse(f.get("flowboard/.claude-plugin/plugin.json")!).name).toBe("flowboard");
-    expect(JSON.parse(f.get("flowboard/.mcp.json")!).mcpServers.flowboard).toEqual({ type: "http", url: MCP });
-    const hooks = JSON.parse(f.get("flowboard/hooks/hooks.json")!).hooks;
+    expect(JSON.parse(f.get(".claude-plugin/marketplace.json")!).plugins[0]).toMatchObject({ name: "mixedlane", source: "./mixedlane" });
+    expect(JSON.parse(f.get("mixedlane/.claude-plugin/plugin.json")!).name).toBe("mixedlane");
+    expect(JSON.parse(f.get("mixedlane/.mcp.json")!).mcpServers.mixedlane).toEqual({ type: "http", url: MCP });
+    const hooks = JSON.parse(f.get("mixedlane/hooks/hooks.json")!).hooks;
     expect(Object.keys(hooks)).toEqual(["SessionStart", "UserPromptSubmit", "PostToolUse"]);
     expect(hooks.PostToolUse[0].matcher).toBe("ExitPlanMode");
-    expect(f.get("flowboard/agents/flowboard-planner.md")).toMatch(/^---\nname: flowboard-planner/);
-    expect([...f.keys()].filter((k) => k.startsWith("flowboard/commands/")).length).toBe(5);
-    expect(f.get("flowboard/skills/flowboard-init/SKILL.md")).toContain(`"server": "http://${HOST}"`);
+    expect(f.get("mixedlane/agents/mixedlane-planner.md")).toMatch(/^---\nname: mixedlane-planner/);
+    expect([...f.keys()].filter((k) => k.startsWith("mixedlane/commands/")).length).toBe(5);
+    expect(f.get("mixedlane/skills/mixedlane-init/SKILL.md")).toContain(`"server": "http://${HOST}"`);
   });
 
   it("Codex: Codex-compatible manifest, MCP and hooks; Copilot: agent + hooks; opencode & Pi: config snippets", async () => {
     const codex = await bundle("codex");
-    expect(JSON.parse(codex.get("plugins/flowboard/.codex-plugin/plugin.json")!)).toMatchObject({ skills: "./skills/", mcpServers: "./.mcp.json", hooks: "./hooks/hooks.json" });
-    expect(JSON.parse(codex.get(".agents/plugins/marketplace.json")!).plugins[0].source).toEqual({ source: "local", path: "./plugins/flowboard" });
+    expect(JSON.parse(codex.get("plugins/mixedlane/.codex-plugin/plugin.json")!)).toMatchObject({ skills: "./skills/", mcpServers: "./.mcp.json", hooks: "./hooks/hooks.json" });
+    expect(JSON.parse(codex.get(".agents/plugins/marketplace.json")!).plugins[0].source).toEqual({ source: "local", path: "./plugins/mixedlane" });
 
     const copilot = await bundle("copilot");
     expect(JSON.parse(copilot.get("plugin.json")!).$schema).toContain("agent-plugins.org");
-    expect(copilot.has("com.github.copilot/agents/flowboard-planner.agent.md")).toBe(true);
+    expect(copilot.has("com.github.copilot/agents/mixedlane-planner.agent.md")).toBe(true);
     expect(JSON.parse(copilot.get("com.github.copilot/hooks/hooks.json")!).hooks.sessionStart[0]).toHaveProperty("powershell");
 
     const opencode = await bundle("opencode");
-    expect(JSON.parse(opencode.get("flowboard/opencode.json")!).mcp.flowboard).toEqual({ type: "remote", url: MCP, enabled: true });
-    expect(opencode.get("plugins/flowboard.js")).toContain('"experimental.chat.system.transform"');
-    expect(opencode.get("agents/flowboard-planner.md")).toContain("mode: subagent");
+    expect(JSON.parse(opencode.get("mixedlane/opencode.json")!).mcp.mixedlane).toEqual({ type: "remote", url: MCP, enabled: true });
+    expect(opencode.get("plugins/mixedlane.js")).toContain('"experimental.chat.system.transform"');
+    expect(opencode.get("agents/mixedlane-planner.md")).toContain("mode: subagent");
 
     const pi = await bundle("pi");
-    expect(JSON.parse(pi.get("package.json")!).pi.extensions).toEqual(["./extensions/flowboard.ts"]);
-    expect(JSON.parse(pi.get("flowboard/mcp.json")!).mcpServers.flowboard).toMatchObject({ url: MCP, auth: "bearer", bearerToken: "${FLOWBOARD_API_KEY}" });
+    expect(JSON.parse(pi.get("package.json")!).pi.extensions).toEqual(["./extensions/mixedlane.ts"]);
+    expect(JSON.parse(pi.get("mixedlane/mcp.json")!).mcpServers.mixedlane).toMatchObject({ url: MCP, auth: "bearer", bearerToken: "${MIXEDLANE_API_KEY}" });
   });
 });
 
 describe("hook script", () => {
   it("links the repo's project, nudges on planning prompts only, and speaks each client's format", async () => {
     const files = await bundle("claude-code");
-    const dir = mkdtempSync(join(tmpdir(), "fb-hook-"));
-    const hook = join(dir, "flowboard-hook.mjs");
-    writeFileSync(hook, files.get("flowboard/hooks/flowboard-hook.mjs")!);
-    writeFileSync(join(dir, "flowboard-rules.md"), files.get("flowboard/hooks/flowboard-rules.md")!);
+    const dir = mkdtempSync(join(tmpdir(), "ml-hook-"));
+    const hook = join(dir, "mixedlane-hook.mjs");
+    writeFileSync(hook, files.get("mixedlane/hooks/mixedlane-hook.mjs")!);
+    writeFileSync(join(dir, "mixedlane-rules.md"), files.get("mixedlane/hooks/mixedlane-rules.md")!);
     const repo = join(dir, "repo");
     mkdirSync(join(repo, "src"), { recursive: true });
-    writeFileSync(join(repo, ".flowboard.json"), JSON.stringify({ project: "MKA", organization: "demo" }));
+    writeFileSync(join(repo, ".mixedlane.json"), JSON.stringify({ project: "MKA", organization: "demo" }));
     const run = (args: string[], input: object) => execFileSync(process.execPath, [hook, ...args], { input: JSON.stringify(input), encoding: "utf8" });
 
     const start = JSON.parse(run(["session-start", "claude"], { cwd: join(repo, "src") }));

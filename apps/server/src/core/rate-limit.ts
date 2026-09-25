@@ -21,7 +21,7 @@ export function apiRateLimit() {
     if (!req.path.startsWith("/api/") || req.path === "/api/health") return next();
     const limit = config().API_RATE_LIMIT;
     const auth = req.header("authorization");
-    const client = auth?.startsWith("Bearer fb_") ? `key:${auth.slice(7, 22)}` : `ip:${req.ip}`;
+    const client = auth?.startsWith("Bearer ml_") ? `key:${auth.slice(7, 22)}` : `ip:${req.ip}`;
     const now = Date.now();
     let w = windows.get(client);
     if (!w || w.resetAt <= now) {

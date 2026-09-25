@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { extractItemKeys, type DeploySource, type GitTrigger, type PrState } from "@flowboard/shared";
+import { extractItemKeys, type DeploySource, type GitTrigger, type PrState } from "@mixedlane/shared";
 import type { Actor } from "../../core/context";
 import { CommentsService } from "../work/comments.service";
 import { ItemsService, type ItemRow } from "../work/items.service";

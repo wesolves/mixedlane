@@ -6,7 +6,7 @@ import { bootApp, signUp, type TestApp } from "./harness";
 
 /** Production behaviour: SPA serving with a strict CSP, API rate limiting, health checks, cookies. */
 let ctx: TestApp;
-const web = mkdtempSync(join(tmpdir(), "flowboard-web-"));
+const web = mkdtempSync(join(tmpdir(), "mixedlane-web-"));
 
 beforeAll(async () => {
   mkdirSync(join(web, "assets"));
@@ -44,7 +44,7 @@ describe("single-container web serving", () => {
     const res = await ctx.http().post("/api/auth/register").send({ name: "A", email: "a@web.dev", password: "Passw0rd!", orgName: "Web" });
     expect(res.status).toBe(201);
     const cookies = ([] as string[]).concat(res.headers["set-cookie"] ?? []);
-    expect(cookies.some((c) => c.startsWith("fb_rt=") && c.includes("HttpOnly") && !c.includes("Secure"))).toBe(true);
+    expect(cookies.some((c) => c.startsWith("ml_rt=") && c.includes("HttpOnly") && !c.includes("Secure"))).toBe(true);
   });
 });
 

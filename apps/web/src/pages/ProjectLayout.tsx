@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useParams } from "react-router-dom";
 import { LayoutGrid, ListTree, Plus, Settings, SquareKanban } from "lucide-react";
-import { PROJECT_ROLE_LABELS, type Project, type WorkItemSummary } from "@flowboard/shared";
+import { PROJECT_ROLE_LABELS, type Project, type WorkItemSummary } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProjectIcon } from "@/components/common";

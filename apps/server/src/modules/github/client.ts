@@ -22,7 +22,7 @@ export class GitHubClient {
         accept: "application/vnd.github+json",
         authorization: `Bearer ${this.token}`,
         "x-github-api-version": "2022-11-28",
-        "user-agent": "flowboard",
+        "user-agent": "mixedlane",
         ...(init?.body ? { "content-type": "application/json" } : {}),
         ...init?.headers,
       },

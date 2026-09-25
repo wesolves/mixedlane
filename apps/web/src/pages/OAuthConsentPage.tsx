@@ -78,7 +78,7 @@ export function OAuthConsentPage() {
     !clientId || !redirectUri || responseType !== "code" || !codeChallenge || method !== "S256"
       ? "This sign-in link is incomplete (it needs client_id, redirect_uri and a PKCE S256 code_challenge)."
       : client.isError
-        ? "This app isn't registered with Flowboard. Try connecting again from the app."
+        ? "This app isn't registered with Mixedlane. Try connecting again from the app."
         : client.data && !client.data.redirectUris.includes(redirectUri)
           ? "The return address doesn't match what this app registered."
           : client.data?.linkUsed
@@ -147,7 +147,7 @@ export function OAuthConsentPage() {
         <div className="min-w-0">
           <h1 className="text-lg font-semibold">Connect {client.data.name}</h1>
           <p className="text-sm text-muted-foreground">
-            wants to work in Flowboard as an AI agent · returns to <span className="font-mono">{redirectHost}</span>
+            wants to work in Mixedlane as an AI agent · returns to <span className="font-mono">{redirectHost}</span>
           </p>
         </div>
       </div>

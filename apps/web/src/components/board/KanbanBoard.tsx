@@ -15,7 +15,7 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { MessageSquare, Plus, Rocket } from "lucide-react";
-import type { ItemType, StatusDef, WorkItemSummary } from "@flowboard/shared";
+import type { ItemType, StatusDef, WorkItemSummary } from "@mixedlane/shared";
 import { PriorityIcon, ProgressBar, StatusIcon, TypeIcon, UserAvatar } from "@/components/common";
 import { DueDate } from "@/components/item/ItemViews";
 import { PR_META } from "@/components/item/DevelopmentPanel";

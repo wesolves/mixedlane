@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Flowboard hook for Claude Code, Codex and Copilot. Dependency-free (Node ≥ 18) and never blocks:
+// Mixedlane hook for Claude Code, Codex and Copilot. Dependency-free (Node ≥ 18) and never blocks:
 // it always exits 0, and prints nothing when it has nothing to add.
 //
 // Usage (arguments may appear in any order, so it also works when launched via `node -e`):
-//   flowboard-hook.mjs <session-start|prompt|plan-approved> [claude|codex|copilot]
+//   mixedlane-hook.mjs <session-start|prompt|plan-approved> [claude|codex|copilot]
 // Reads the hook's JSON payload from stdin (cwd, prompt, …) when there is one.
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -36,11 +36,11 @@ function readStdin() {
   });
 }
 
-/** The nearest .flowboard.json from the working directory up to the filesystem root. */
+/** The nearest .mixedlane.json from the working directory up to the filesystem root. */
 function findProject(cwd) {
   let dir = resolve(cwd);
   for (;;) {
-    const file = join(dir, ".flowboard.json");
+    const file = join(dir, ".mixedlane.json");
     if (existsSync(file)) {
       try {
         return { file, ...JSON.parse(readFileSync(file, "utf8")) };
@@ -56,29 +56,29 @@ function findProject(cwd) {
 
 function rules() {
   const here = dirname(fileURLToPath(import.meta.url));
-  for (const p of [join(here, "flowboard-rules.md"), join(here, "..", "flowboard-rules.md")]) {
+  for (const p of [join(here, "mixedlane-rules.md"), join(here, "..", "mixedlane-rules.md")]) {
     if (existsSync(p)) return readFileSync(p, "utf8").trim();
   }
-  return "Use the Flowboard MCP tools: record plans with create_plan (epic → story → task), start_work / complete_work while you work.";
+  return "Use the Mixedlane MCP tools: record plans with create_plan (epic → story → task), start_work / complete_work while you work.";
 }
 
 function contextFor(input) {
   const cwd = input.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const project = findProject(cwd);
   const link = project?.invalid
-    ? `The repo's ${project.file} is not valid JSON — fix it or run the flowboard-init skill.`
+    ? `The repo's ${project.file} is not valid JSON — fix it or run the mixedlane-init skill.`
     : project?.project
-      ? `This repository is linked to Flowboard project **${project.project}**${project.organization ? ` (org ${project.organization})` : ""}. Plan and track its work there.`
-      : "This repository isn't linked to a Flowboard project yet (no .flowboard.json). When you need one, use the flowboard-init skill.";
+      ? `This repository is linked to Mixedlane project **${project.project}**${project.organization ? ` (org ${project.organization})` : ""}. Plan and track its work there.`
+      : "This repository isn't linked to a Mixedlane project yet (no .mixedlane.json). When you need one, use the mixedlane-init skill.";
 
-  if (event === "session-start") return `## Flowboard\n${link}\n\n${rules()}`;
+  if (event === "session-start") return `## Mixedlane\n${link}\n\n${rules()}`;
   if (event === "prompt") {
     const prompt = String(input.prompt ?? input.user_prompt ?? "");
     if (!PLANNING.test(prompt)) return "";
-    return `Flowboard: if this results in a plan or new requirements, record it with the flowboard-planning skill (create_plan) per your planning mode${project?.project ? ` in project ${project.project}` : ""}, and track progress with start_work / complete_work.`;
+    return `Mixedlane: if this results in a plan or new requirements, record it with the mixedlane-planning skill (create_plan) per your planning mode${project?.project ? ` in project ${project.project}` : ""}, and track progress with start_work / complete_work.`;
   }
   if (event === "plan-approved") {
-    return `Flowboard: the plan was just approved. Before (or as the first step of) implementing it, record it in Flowboard with the flowboard-planning skill — create_plan with epic → stories → tasks${project?.project ? ` in project ${project.project}` : ""}, following your planning mode — then start_work on the first task.`;
+    return `Mixedlane: the plan was just approved. Before (or as the first step of) implementing it, record it in Mixedlane with the mixedlane-planning skill — create_plan with epic → stories → tasks${project?.project ? ` in project ${project.project}` : ""}, following your planning mode — then start_work on the first task.`;
   }
   return "";
 }

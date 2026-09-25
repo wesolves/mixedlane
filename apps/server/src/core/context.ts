@@ -1,6 +1,6 @@
 import { SetMetadata, createParamDecorator, type ExecutionContext } from "@nestjs/common";
 import type { Request } from "express";
-import type { OrgPermission, OrgRole, ProjectAccessInfo } from "@flowboard/shared";
+import type { OrgPermission, OrgRole, ProjectAccessInfo } from "@mixedlane/shared";
 import type { ActorType } from "./database/schema";
 
 /** Who is acting. Stored on comments/activity and used for permission checks. */
@@ -40,11 +40,11 @@ declare module "express" {
 }
 
 /** Skip authentication entirely (login, webhooks, invite previews…). */
-export const PUBLIC = "flowboard:public";
+export const PUBLIC = "mixedlane:public";
 export const Public = () => SetMetadata(PUBLIC, true);
 
 /** Authenticated, but not tied to an organization (e.g. /auth/me, list/create orgs). */
-export const NO_ORG = "flowboard:no-org";
+export const NO_ORG = "mixedlane:no-org";
 export const NoOrg = () => SetMetadata(NO_ORG, true);
 
 /** Injects the org-scoped RequestContext into a controller method. */

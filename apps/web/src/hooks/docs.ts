@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { PageNode } from "@flowboard/shared";
+import type { PageNode } from "@mixedlane/shared";
 import { api } from "@/lib/api";
 
 export const dk = {

@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import type { ItemType, Project, ProjectAccessInfo, ProjectPermission, StatusDef } from "@flowboard/shared";
+import type { ItemType, Project, ProjectAccessInfo, ProjectPermission, StatusDef } from "@mixedlane/shared";
 import { getCurrentOrg } from "./session";
 
 interface Scope {

@@ -9,7 +9,7 @@ import {
   teamMemberSchema,
   teamUpdateSchema,
   type OrgRole,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { Auth, Ctx, NoOrg, type AuthInfo, type RequestContext } from "../../core/context";
 import { ZBody } from "../../core/zod-body";
 import { requireOrg } from "../access/access.service";

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import type { Comment } from "@flowboard/shared";
+import type { Comment } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { RichEditor, RichText, isEmptyHtml } from "@/components/editor/RichEditor";

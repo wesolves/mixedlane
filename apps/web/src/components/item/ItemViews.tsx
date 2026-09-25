@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format, isPast, parseISO } from "date-fns";
 import { CalendarDays, MessageSquare, Plus } from "lucide-react";
-import { TYPE_LABELS, type ItemType, type WorkItemSummary } from "@flowboard/shared";
+import { TYPE_LABELS, type ItemType, type WorkItemSummary } from "@mixedlane/shared";
 import { Input } from "@/components/ui/input";
 import { PriorityIcon, ProgressBar, StatusPill, TypeIcon, UserAvatar } from "@/components/common";
 import { StatusPicker } from "@/components/pickers";

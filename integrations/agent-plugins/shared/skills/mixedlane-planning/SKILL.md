@@ -1,17 +1,17 @@
 ---
-name: flowboard-planning
-description: Record plans and requirements as Flowboard work items (epic → milestone → user story → task → subtask). Use whenever you create an implementation plan, break down a feature, bug list, spec or requirements, or the user asks to plan, scope or build something non-trivial.
+name: mixedlane-planning
+description: Record plans and requirements as Mixedlane work items (epic → milestone → user story → task → subtask). Use whenever you create an implementation plan, break down a feature, bug list, spec or requirements, or the user asks to plan, scope or build something non-trivial.
 ---
 
-# Plan work in Flowboard
+# Plan work in Mixedlane
 
-Turn the plan you just made — or the requirements you were given — into a clean Flowboard breakdown that the
-team can see on the board. Use the `flowboard` MCP tools.
+Turn the plan you just made — or the requirements you were given — into a clean Mixedlane breakdown that the
+team can see on the board. Use the `mixedlane` MCP tools.
 
 ## 1. Find the project
-- If the repo has a `.flowboard.json`, use its `project` key.
+- If the repo has a `.mixedlane.json`, use its `project` key.
 - Otherwise call `list_projects`. If there is exactly one sensible project, use it; if it's unclear, ask the user
-  which one (and offer to link the repo with the `flowboard-init` skill).
+  which one (and offer to link the repo with the `mixedlane-init` skill).
 - **New initiative with no fitting project?** Create it with `create_project` (a short 2–5 letter key like `MKA`,
   enable only the levels it needs, e.g. `["epic","story","task"]`). If the tool says you aren't allowed, tell the
   user the exact setting it names (Settings → AI agents → your agent → "Can create projects") instead of stopping
@@ -47,4 +47,4 @@ their parent's `ref` (or at an existing key such as `APP-0012`).
 
 ## 5. Report
 Reply with the created/reused keys as a short indented tree (key — title), and the board link for the epic.
-Then continue with the work, using the `flowboard-work-tracking` skill.
+Then continue with the work, using the `mixedlane-work-tracking` skill.

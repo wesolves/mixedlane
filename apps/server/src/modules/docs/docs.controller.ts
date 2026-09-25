@@ -1,6 +1,6 @@
 import { Controller, Delete, Get, HttpCode, Module, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiHeader, ApiTags } from "@nestjs/swagger";
-import { pageCreateSchema, pageMoveSchema, pageUpdateSchema, spaceCreateSchema, spaceUpdateSchema } from "@flowboard/shared";
+import { pageCreateSchema, pageMoveSchema, pageUpdateSchema, spaceCreateSchema, spaceUpdateSchema } from "@mixedlane/shared";
 import type { z } from "zod";
 import { Ctx, type RequestContext } from "../../core/context";
 import { ZBody } from "../../core/zod-body";

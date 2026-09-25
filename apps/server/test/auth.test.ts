@@ -29,7 +29,7 @@ async function lastMailTo(email: string) {
 }
 const tokenFrom = (text: string) => text.match(/token=([\w-]+)/)?.[1] ?? text.match(/invite\/([\w-]+)/)?.[1] ?? "";
 const refreshCookie = (res: request.Response) =>
-  ([] as string[]).concat(res.headers["set-cookie"] ?? []).find((c) => c.startsWith("fb_rt="))?.split(";")[0] ?? "";
+  ([] as string[]).concat(res.headers["set-cookie"] ?? []).find((c) => c.startsWith("ml_rt="))?.split(";")[0] ?? "";
 
 describe("register & login", () => {
   it("registers a user with their own org and returns a working access token", async () => {
@@ -38,8 +38,8 @@ describe("register & login", () => {
     expect(res.body.user).toMatchObject({ email: "ann@example.com", name: "Ann", emailVerified: false });
     expect(res.body.orgs).toEqual([expect.objectContaining({ slug: "acme-inc", role: "owner" })]);
     const cookies = ([] as string[]).concat(res.headers["set-cookie"]);
-    expect(cookies.find((c) => c.startsWith("fb_rt="))).toMatch(/HttpOnly/i);
-    expect(cookies.find((c) => c.startsWith("fb_rt="))).toMatch(/Path=\/api\/auth/);
+    expect(cookies.find((c) => c.startsWith("ml_rt="))).toMatch(/HttpOnly/i);
+    expect(cookies.find((c) => c.startsWith("ml_rt="))).toMatch(/Path=\/api\/auth/);
 
     const me = await ctx.http().get("/api/auth/me").set("authorization", `Bearer ${res.body.accessToken}`);
     expect(me.body.user.email).toBe("ann@example.com");
@@ -73,17 +73,17 @@ describe("refresh token rotation", () => {
     // Missing CSRF header is refused.
     expect((await ctx.http().post("/api/auth/refresh").set("cookie", first)).status).toBe(400);
 
-    const r1 = await ctx.http().post("/api/auth/refresh").set("cookie", first).set("x-requested-with", "flowboard");
+    const r1 = await ctx.http().post("/api/auth/refresh").set("cookie", first).set("x-requested-with", "mixedlane");
     expect(r1.status).toBe(200);
     const second = refreshCookie(r1);
     expect(second).not.toBe(first);
 
     // Replaying the first token inside the grace window (parallel tabs) is tolerated…
-    expect((await ctx.http().post("/api/auth/refresh").set("cookie", first).set("x-requested-with", "flowboard")).status).toBe(200);
+    expect((await ctx.http().post("/api/auth/refresh").set("cookie", first).set("x-requested-with", "mixedlane")).status).toBe(200);
     // …but after it, it's treated as theft: the whole family is revoked.
     await db.execute(sql`UPDATE sessions SET revoked_at = now() - interval '1 hour' WHERE revoked_at IS NOT NULL`);
-    expect((await ctx.http().post("/api/auth/refresh").set("cookie", first).set("x-requested-with", "flowboard")).status).toBe(401);
-    expect((await ctx.http().post("/api/auth/refresh").set("cookie", second).set("x-requested-with", "flowboard")).status).toBe(401);
+    expect((await ctx.http().post("/api/auth/refresh").set("cookie", first).set("x-requested-with", "mixedlane")).status).toBe(401);
+    expect((await ctx.http().post("/api/auth/refresh").set("cookie", second).set("x-requested-with", "mixedlane")).status).toBe(401);
     // Access tokens of the revoked family stop working immediately.
     expect((await ctx.http().get("/api/auth/me").set("authorization", `Bearer ${r1.body.accessToken}`)).status).toBe(401);
   });
@@ -165,18 +165,18 @@ describe("session length", () => {
   it("defaults to 30 days, is configurable per user, and access tokens last 5 minutes", async () => {
     const { user } = await signUp(ctx);
     const cookieDays = (res: { headers: Record<string, unknown> }) => {
-      const c = ([] as string[]).concat((res.headers["set-cookie"] as string[]) ?? []).find((x) => x.startsWith("fb_rt="))!;
+      const c = ([] as string[]).concat((res.headers["set-cookie"] as string[]) ?? []).find((x) => x.startsWith("ml_rt="))!;
       const expires = new Date(/Expires=([^;]+)/i.exec(c)![1]).getTime();
       return Math.round((expires - Date.now()) / 86_400_000);
     };
-    const first = await user.agent.post("/api/auth/refresh").set("x-requested-with", "flowboard");
+    const first = await user.agent.post("/api/auth/refresh").set("x-requested-with", "mixedlane");
     expect(first.body.expiresIn).toBe(300);
     expect(first.body.user.sessionDays).toBe(30);
     expect(cookieDays(first)).toBe(30);
 
     expect((await user.agent.patch("/api/auth/me").set("authorization", `Bearer ${first.body.accessToken}`).send({ sessionDays: 45 })).status).toBe(400);
     await user.agent.patch("/api/auth/me").set("authorization", `Bearer ${first.body.accessToken}`).send({ sessionDays: 90 }).expect(200);
-    const next = await user.agent.post("/api/auth/refresh").set("x-requested-with", "flowboard");
+    const next = await user.agent.post("/api/auth/refresh").set("x-requested-with", "mixedlane");
     expect(next.body.user.sessionDays).toBe(90);
     expect(cookieDays(next)).toBe(90);
   });

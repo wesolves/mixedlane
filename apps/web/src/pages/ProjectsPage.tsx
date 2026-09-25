@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { ChevronRight, FolderPlus, Plus } from "lucide-react";
-import { sortTypes } from "@flowboard/shared";
+import { sortTypes } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ProgressBar, ProjectIcon, TypeIcon } from "@/components/common";

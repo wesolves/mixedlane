@@ -9,9 +9,9 @@ import {
   type PageVersion,
   type PageVersionSummary,
   type Space,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import type { z } from "zod";
-import type { pageCreateSchema, pageMoveSchema, pageUpdateSchema, spaceCreateSchema, spaceUpdateSchema } from "@flowboard/shared";
+import type { pageCreateSchema, pageMoveSchema, pageUpdateSchema, spaceCreateSchema, spaceUpdateSchema } from "@mixedlane/shared";
 import type { RequestContext } from "../../core/context";
 import { DB, type Db, type Executor } from "../../core/database/database";
 import { pageItemLinks, pageVersions, pages, projects, spaces, workItems } from "../../core/database/schema";

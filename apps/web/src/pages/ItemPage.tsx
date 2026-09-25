@@ -1,5 +1,5 @@
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { ITEM_TYPES, type ItemType } from "@flowboard/shared";
+import { ITEM_TYPES, type ItemType } from "@mixedlane/shared";
 import { ItemDetail } from "@/components/item/ItemDetail";
 import { useItem } from "@/hooks/queries";
 import { paths } from "@/lib/project";

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
-import { defaultAutomation, type GitAutomation, type GitHubConnectionInfo, type LinkedRepo } from "@flowboard/shared";
+import { defaultAutomation, type GitAutomation, type GitHubConnectionInfo, type LinkedRepo } from "@mixedlane/shared";
 import { DB, type Db } from "../../core/database/database";
 import { ghEntities, ghLinks, githubConnections, projectRepos, projects, workItems } from "../../core/database/schema";
 import { GitHubClient } from "./client";

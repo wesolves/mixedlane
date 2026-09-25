@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { X } from "lucide-react";
-import { TYPE_LABELS, type ItemUpdate, type WorkItemDetail } from "@flowboard/shared";
+import { TYPE_LABELS, type ItemUpdate, type WorkItemDetail } from "@mixedlane/shared";
 import { Input } from "@/components/ui/input";
 import { AssigneePicker, PriorityPicker, StatusPicker } from "@/components/pickers";
 import { TypeIcon } from "@/components/common";

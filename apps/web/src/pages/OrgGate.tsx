@@ -12,7 +12,7 @@ function FullScreenSpinner() {
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-3">
       <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      {offline && <p className="text-sm text-muted-foreground">Reconnecting to Flowboard… you're still signed in.</p>}
+      {offline && <p className="text-sm text-muted-foreground">Reconnecting to Mixedlane… you're still signed in.</p>}
     </div>
   );
 }

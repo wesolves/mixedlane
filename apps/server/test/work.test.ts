@@ -96,7 +96,7 @@ describe("uploads", () => {
     );
     const up = await api.post("/api/uploads").attach("file", png, { filename: "a.png", contentType: "image/png" });
     expect(up.status).toBe(201);
-    // Files load via the httpOnly fb_file cookie the agent received at sign-up (like <img> tags do).
+    // Files load via the httpOnly ml_file cookie the agent received at sign-up (like <img> tags do).
     const get = await me.agent.get(up.body.url).set("Range", "bytes=0-9");
     expect(get.status).toBe(206);
     expect(get.headers["content-range"]).toBe(`bytes 0-9/${png.length}`);

@@ -43,7 +43,7 @@ import type {
   WorkItem,
   WorkItemDetail,
   WorkItemSummary,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { getAccessToken, getCurrentOrg, refreshSession } from "./session";
 
 export class ApiError extends Error {

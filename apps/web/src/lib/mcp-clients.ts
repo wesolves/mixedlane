@@ -5,7 +5,7 @@
  * so the key doesn't end up in a config file that might be committed.
  */
 
-export const KEY_ENV = "FLOWBOARD_API_KEY";
+export const KEY_ENV = "MIXEDLANE_API_KEY";
 
 export interface SnippetStep {
   /** What this step is, e.g. "Add the server". */
@@ -23,14 +23,14 @@ export interface McpClient {
   blurb: string;
   /** Sign in through the browser (OAuth) — no key to copy. Only for clients that support it. */
   oauth?: (url: string) => SnippetStep[];
-  /** Flowboard plugin id (hooks + skills + agent), installable with a one-liner. */
+  /** Mixedlane plugin id (hooks + skills + agent), installable with a one-liner. */
   plugin?: "claude-code" | "codex" | "copilot" | "opencode" | "pi";
   /** Connect with an agent API key. */
   steps: (url: string, key: string) => SnippetStep[];
   docs: string;
 }
 
-const signInNote = "A browser opens: sign in to Flowboard, pick the agent (or create one) and click Allow.";
+const signInNote = "A browser opens: sign in to Mixedlane, pick the agent (or create one) and click Allow.";
 
 const json = (v: unknown) => JSON.stringify(v, null, 2);
 
@@ -48,14 +48,14 @@ export const MCP_CLIENTS: McpClient[] = [
     blurb: "Native remote MCP over HTTP.",
     docs: "https://docs.anthropic.com/en/docs/claude-code/mcp",
     oauth: (url) => [
-      { title: "Add the server", lang: "bash", code: `claude mcp add --transport http flowboard ${url}` },
-      { title: "Sign in", lang: "bash", code: "/mcp", note: `In Claude Code, run /mcp, select flowboard → Authenticate. ${signInNote}` },
+      { title: "Add the server", lang: "bash", code: `claude mcp add --transport http mixedlane ${url}` },
+      { title: "Sign in", lang: "bash", code: "/mcp", note: `In Claude Code, run /mcp, select mixedlane → Authenticate. ${signInNote}` },
     ],
     steps: (url, key) => [
       {
         title: "Add the server",
         lang: "bash",
-        code: `claude mcp add --transport http flowboard ${url} --header "Authorization: Bearer ${key}"`,
+        code: `claude mcp add --transport http mixedlane ${url} --header "Authorization: Bearer ${key}"`,
         note: "Add `-s user` to use it in every project. Then run /mcp in Claude Code to check it's connected.",
       },
     ],
@@ -70,7 +70,7 @@ export const MCP_CLIENTS: McpClient[] = [
         title: "Add to claude_desktop_config.json",
         lang: "json",
         code: json({
-          mcpServers: { flowboard: { command: "npx", args: ["-y", "mcp-remote", url, "--header", "Authorization:${AUTH}"], env: { AUTH: `Bearer ${key}` } } },
+          mcpServers: { mixedlane: { command: "npx", args: ["-y", "mcp-remote", url, "--header", "Authorization:${AUTH}"], env: { AUTH: `Bearer ${key}` } } },
         }),
         note: "Settings → Developer → Edit Config, then restart Claude Desktop.",
       },
@@ -83,21 +83,21 @@ export const MCP_CLIENTS: McpClient[] = [
     blurb: "OpenAI Codex CLI & IDE extension, streamable HTTP with a bearer token from an env var.",
     docs: "https://developers.openai.com/codex/mcp",
     oauth: (url) => [
-      { title: "Add the server", lang: "bash", code: `codex mcp add flowboard --url ${url}` },
-      { title: "Sign in", lang: "bash", code: "codex mcp login flowboard", note: signInNote },
+      { title: "Add the server", lang: "bash", code: `codex mcp add mixedlane --url ${url}` },
+      { title: "Sign in", lang: "bash", code: "codex mcp login mixedlane", note: signInNote },
     ],
     steps: (url, key) => [
       ...envSteps(key),
       {
         title: "Add the server",
         lang: "bash",
-        code: `codex mcp add flowboard --url ${url} --bearer-token-env-var ${KEY_ENV}`,
+        code: `codex mcp add mixedlane --url ${url} --bearer-token-env-var ${KEY_ENV}`,
       },
       {
         title: "…or edit ~/.codex/config.toml directly",
         lang: "toml",
-        code: `[mcp_servers.flowboard]\nurl = "${url}"\nbearer_token_env_var = "${KEY_ENV}"\ntool_timeout_sec = 60`,
-        note: "Check it with `codex mcp list`, then ask Codex e.g. “list my Flowboard projects”.",
+        code: `[mcp_servers.mixedlane]\nurl = "${url}"\nbearer_token_env_var = "${KEY_ENV}"\ntool_timeout_sec = 60`,
+        note: "Check it with `codex mcp list`, then ask Codex e.g. “list my Mixedlane projects”.",
       },
     ],
   },
@@ -111,7 +111,7 @@ export const MCP_CLIENTS: McpClient[] = [
       {
         title: "Create .vscode/mcp.json (or run “MCP: Open User Configuration” for all workspaces)",
         lang: "json",
-        code: json({ servers: { flowboard: { type: "http", url } } }),
+        code: json({ servers: { mixedlane: { type: "http", url } } }),
         note: `Click Start above the server; VS Code asks to sign in. ${signInNote}`,
       },
     ],
@@ -120,10 +120,10 @@ export const MCP_CLIENTS: McpClient[] = [
         title: "Create .vscode/mcp.json (or run “MCP: Open User Configuration” for all workspaces)",
         lang: "json",
         code: json({
-          inputs: [{ type: "promptString", id: "flowboard-key", description: "Flowboard API key (fb_…)", password: true }],
-          servers: { flowboard: { type: "http", url, headers: { Authorization: "Bearer ${input:flowboard-key}" } } },
+          inputs: [{ type: "promptString", id: "mixedlane-key", description: "Mixedlane API key (ml_…)", password: true }],
+          servers: { mixedlane: { type: "http", url, headers: { Authorization: "Bearer ${input:mixedlane-key}" } } },
         }),
-        note: "Click Start above the server in mcp.json, paste the key when asked, then pick the Flowboard tools in Copilot Chat's Agent mode.",
+        note: "Click Start above the server in mcp.json, paste the key when asked, then pick the Mixedlane tools in Copilot Chat's Agent mode.",
       },
     ],
   },
@@ -137,7 +137,7 @@ export const MCP_CLIENTS: McpClient[] = [
       {
         title: "Add the server",
         lang: "bash",
-        code: `copilot mcp add --transport http flowboard ${url}`,
+        code: `copilot mcp add --transport http mixedlane ${url}`,
         note: `Copilot signs in the first time it connects. ${signInNote}`,
       },
     ],
@@ -145,12 +145,12 @@ export const MCP_CLIENTS: McpClient[] = [
       {
         title: "Add the server",
         lang: "bash",
-        code: `copilot mcp add --transport http --header "Authorization: Bearer ${key}" flowboard ${url}`,
+        code: `copilot mcp add --transport http --header "Authorization: Bearer ${key}" mixedlane ${url}`,
       },
       {
         title: "…or edit ~/.copilot/mcp-config.json",
         lang: "json",
-        code: json({ mcpServers: { flowboard: { type: "http", url, headers: { Authorization: `Bearer ${key}` }, tools: ["*"] } } }),
+        code: json({ mcpServers: { mixedlane: { type: "http", url, headers: { Authorization: `Bearer ${key}` }, tools: ["*"] } } }),
         note: "Inside a session, /mcp shows the server and its tools.",
       },
     ],
@@ -165,9 +165,9 @@ export const MCP_CLIENTS: McpClient[] = [
       {
         title: "Add to opencode.json (project) or ~/.config/opencode/opencode.json (global)",
         lang: "json",
-        code: json({ $schema: "https://opencode.ai/config.json", mcp: { flowboard: { type: "remote", url, enabled: true } } }),
+        code: json({ $schema: "https://opencode.ai/config.json", mcp: { mixedlane: { type: "remote", url, enabled: true } } }),
       },
-      { title: "Sign in", lang: "bash", code: "opencode mcp auth flowboard", note: signInNote },
+      { title: "Sign in", lang: "bash", code: "opencode mcp auth mixedlane", note: signInNote },
     ],
     steps: (url, key) => [
       ...envSteps(key),
@@ -176,7 +176,7 @@ export const MCP_CLIENTS: McpClient[] = [
         lang: "json",
         code: json({
           $schema: "https://opencode.ai/config.json",
-          mcp: { flowboard: { type: "remote", url, enabled: true, oauth: false, headers: { Authorization: `Bearer {env:${KEY_ENV}}` } } },
+          mcp: { mixedlane: { type: "remote", url, enabled: true, oauth: false, headers: { Authorization: `Bearer {env:${KEY_ENV}}` } } },
         }),
         note: "`oauth: false` stops opencode trying OAuth first. Check it with `opencode mcp list`.",
       },
@@ -194,8 +194,8 @@ export const MCP_CLIENTS: McpClient[] = [
       {
         title: "Add to ~/.config/mcp/mcp.json (global) or .mcp.json (project)",
         lang: "json",
-        code: json({ mcpServers: { flowboard: { url, auth: "bearer", bearerToken: `\${${KEY_ENV}}` } } }),
-        note: "Restart Pi. It reaches Flowboard through its `mcp` tool, e.g. mcp({ search: \"flowboard\" }).",
+        code: json({ mcpServers: { mixedlane: { url, auth: "bearer", bearerToken: `\${${KEY_ENV}}` } } }),
+        note: "Restart Pi. It reaches Mixedlane through its `mcp` tool, e.g. mcp({ search: \"mixedlane\" }).",
       },
     ],
   },

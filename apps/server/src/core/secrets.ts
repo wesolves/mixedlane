@@ -22,7 +22,7 @@ export function devSecret(name: string, bytes = 32): string {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   if (!existsSync(file)) {
     writeFileSync(file, randomBytes(bytes).toString("hex"), { mode: 0o600 });
-    if (SECRETS_DIR) console.warn(`[flowboard] Generated secret "${name}" in ${file} — keep this volume (or set it via env) or sessions and stored tokens stop working.`);
+    if (SECRETS_DIR) console.warn(`[mixedlane] Generated secret "${name}" in ${file} — keep this volume (or set it via env) or sessions and stored tokens stop working.`);
   }
   const value = readFileSync(file, "utf8").trim();
   cache.set(name, value);

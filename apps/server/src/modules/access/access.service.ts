@@ -10,7 +10,7 @@ import {
   type ProjectAccessOverview,
   type ProjectPermission,
   type ProjectRole,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import type { RequestContext } from "../../core/context";
 import { DB, type Db } from "../../core/database/database";
 import { agents, orgMembers, orgs, projectAccess, projects, teamMembers, teams, users, workItems } from "../../core/database/schema";
@@ -22,7 +22,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Tells agents exactly which setting would allow what they tried (instead of a bare "denied"). */
 function agentHint(ctx: RequestContext, what: string) {
-  return ctx.agent ? ` An org owner/admin can allow it in Flowboard → Settings → AI agents → ${ctx.agent.name} → ${what}.` : "";
+  return ctx.agent ? ` An org owner/admin can allow it in Mixedlane → Settings → AI agents → ${ctx.agent.name} → ${what}.` : "";
 }
 
 export function requireOrg(ctx: RequestContext, permission: OrgPermission) {
@@ -148,7 +148,7 @@ export class AccessService {
         throw new AppError(
           404,
           ctx.agent.canCreateProjects
-            ? `Project "${idOrKey.toUpperCase()}" doesn't exist. Create it with the create_project tool, then retry (if your tool list has no create_project, reconnect the Flowboard MCP server to refresh its tools).`
+            ? `Project "${idOrKey.toUpperCase()}" doesn't exist. Create it with the create_project tool, then retry (if your tool list has no create_project, reconnect the Mixedlane MCP server to refresh its tools).`
             : `Project "${idOrKey.toUpperCase()}" doesn't exist, and this agent isn't allowed to create projects.${agentHint(ctx, '"Can create projects"')}`,
         );
       }

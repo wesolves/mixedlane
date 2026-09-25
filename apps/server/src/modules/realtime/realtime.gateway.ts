@@ -9,7 +9,7 @@ import {
   type OnGatewayInit,
 } from "@nestjs/websockets";
 import type { Server, Socket } from "socket.io";
-import type { LiveActor, LiveEvent, PresenceResource, PresenceUser } from "@flowboard/shared";
+import type { LiveActor, LiveEvent, PresenceResource, PresenceUser } from "@mixedlane/shared";
 import { originAllowed } from "../../core/config";
 import type { Actor, RequestContext } from "../../core/context";
 import { EventBus } from "../../core/events";

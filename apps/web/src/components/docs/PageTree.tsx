@@ -1,7 +1,7 @@
 import { useMemo, useState, type DragEvent } from "react";
 import { NavLink } from "react-router-dom";
 import { ChevronRight, FileText, Plus } from "lucide-react";
-import type { PageNode } from "@flowboard/shared";
+import type { PageNode } from "@mixedlane/shared";
 import { useMovePage } from "@/hooks/docs";
 import { paths } from "@/lib/project";
 import { cn } from "@/lib/utils";

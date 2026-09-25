@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import type { Request } from "express";
 import { and, eq, gt, isNull } from "drizzle-orm";
-import { DEFAULT_AGENT_PERMISSIONS } from "@flowboard/shared";
+import { DEFAULT_AGENT_PERMISSIONS } from "@mixedlane/shared";
 import { config } from "../../core/config";
 import type { RequestContext } from "../../core/context";
 import { DB, type Db } from "../../core/database/database";
@@ -84,8 +84,8 @@ export class OAuthService {
       resource: `${origin}${MCP_PATH}`,
       authorization_servers: [origin],
       bearer_methods_supported: ["header"],
-      scopes_supported: ["flowboard"],
-      resource_name: "Flowboard",
+      scopes_supported: ["mixedlane"],
+      resource_name: "Mixedlane",
       resource_documentation: `${this.webOrigin(req)}/`,
     };
   }
@@ -101,7 +101,7 @@ export class OAuthService {
       grant_types_supported: ["authorization_code"],
       code_challenge_methods_supported: ["S256"],
       token_endpoint_auth_methods_supported: ["none"],
-      scopes_supported: ["flowboard"],
+      scopes_supported: ["mixedlane"],
     };
   }
 
@@ -227,6 +227,6 @@ export class OAuthService {
       agentId = agent.id;
     }
     const { secret } = await this.agents.createKey(ctx, agentId, { name: `OAuth · ${client.name}` });
-    return { access_token: secret, token_type: "Bearer", scope: "flowboard" };
+    return { access_token: secret, token_type: "Bearer", scope: "mixedlane" };
   }
 }

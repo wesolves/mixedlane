@@ -1,7 +1,7 @@
 import { Controller, Get, HttpCode, Inject, Injectable, Module, Param, Post, Query, type OnModuleInit } from "@nestjs/common";
 import { ApiBearerAuth, ApiHeader, ApiTags } from "@nestjs/swagger";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
-import type { Notification } from "@flowboard/shared";
+import type { Notification } from "@mixedlane/shared";
 import { Ctx, type Actor, type RequestContext } from "../../core/context";
 import { DB, type Db } from "../../core/database/database";
 import { notifications, projects, spaces } from "../../core/database/schema";

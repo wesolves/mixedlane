@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Flowboard images, all built from this one Dockerfile:
+# Mixedlane images, all built from this one Dockerfile:
 #
 #   --target api   backend: REST API, MCP server (/api/mcp), realtime socket, jobs, agent plugins
 #   --target web   nginx: the built web app + reverse proxy to the api (one origin for everything)

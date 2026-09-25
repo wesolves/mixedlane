@@ -13,7 +13,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import type { ItemType, Priority, StatusCategory } from "@flowboard/shared";
+import type { ItemType, Priority, StatusCategory } from "@mixedlane/shared";
 
 export const TYPE_META: Record<ItemType, { icon: LucideIcon; color: string; bg: string }> = {
   epic: { icon: Zap, color: "text-violet-500", bg: "bg-violet-500/12" },

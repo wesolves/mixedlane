@@ -25,7 +25,7 @@ export async function bootApp(overrides: Record<string, string> = {}) {
     WORKER_ENABLED: "false",
     AUTH_RATE_LIMIT: "10000",
     API_RATE_LIMIT: "100000",
-    UPLOAD_DIR: mkdtempSync(join(tmpdir(), "flowboard-uploads-")),
+    UPLOAD_DIR: mkdtempSync(join(tmpdir(), "mixedlane-uploads-")),
     WEB_DIST: "",
     ...overrides,
   });

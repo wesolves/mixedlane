@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { AuthResponse, AuthUser, OrgPermission, OrgSummary } from "@flowboard/shared";
+import type { AuthResponse, AuthUser, OrgPermission, OrgSummary } from "@mixedlane/shared";
 import { api } from "./api";
 import { getCurrentOrg, isOffline, onOffline, onSession, refreshSession, setSession } from "./session";
 

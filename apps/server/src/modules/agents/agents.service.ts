@@ -8,9 +8,9 @@ import {
   type AgentPermission,
   type ApiKeyInfo,
   type CreatedApiKey,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import type { z } from "zod";
-import type { agentCreateSchema, agentGrantSchema, agentUpdateSchema, apiKeyCreateSchema } from "@flowboard/shared";
+import type { agentCreateSchema, agentGrantSchema, agentUpdateSchema, apiKeyCreateSchema } from "@mixedlane/shared";
 import type { RequestContext } from "../../core/context";
 import { DB, type Db } from "../../core/database/database";
 import { activity, agents, apiKeys, orgs, projectAccess, projects, users, workItems } from "../../core/database/schema";
@@ -22,8 +22,8 @@ type AgentRow = typeof agents.$inferSelect;
 type KeyRow = typeof apiKeys.$inferSelect;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** fb_<12 hex prefix>_<43 chars of base64url secret> */
-const KEY_FORMAT = /^(fb_[0-9a-f]{12})_[A-Za-z0-9_-]{43}$/;
+/** ml_<12 hex prefix>_<43 chars of base64url secret> */
+const KEY_FORMAT = /^(ml_[0-9a-f]{12})_[A-Za-z0-9_-]{43}$/;
 const TOUCH_EVERY_MS = 60_000;
 
 const iso = (d: Date | null) => d?.toISOString() ?? null;
@@ -39,7 +39,7 @@ export const toKeyDto = (k: KeyRow): ApiKeyInfo => ({
 });
 
 /** Is this bearer token an API key (as opposed to a session JWT)? */
-export const isApiKey = (token: string) => token.startsWith("fb_");
+export const isApiKey = (token: string) => token.startsWith("ml_");
 
 /**
  * AI agents: org-scoped principals that authenticate with API keys. They see only projects they
@@ -199,7 +199,7 @@ export class AgentsService {
   async createKey(ctx: RequestContext, agentId: string, input: z.output<typeof apiKeyCreateSchema>, reuseSecret?: string): Promise<CreatedApiKey> {
     await this.row(ctx, agentId);
     const reused = reuseSecret ? KEY_FORMAT.exec(reuseSecret) : null;
-    const prefix = reused?.[1] ?? `fb_${randomBytes(6).toString("hex")}`;
+    const prefix = reused?.[1] ?? `ml_${randomBytes(6).toString("hex")}`;
     const secret = reused ? reuseSecret! : `${prefix}_${randomBytes(32).toString("base64url")}`;
     const [k] = await this.db
       .insert(apiKeys)

@@ -42,7 +42,7 @@ export class PluginsController {
     if (file === "install.ps1") return res.type("text/plain; charset=utf-8").send(this.plugins.installPs1(urls));
     const client = file.replace(/\.tar\.gz$/, "");
     if (!file.endsWith(".tar.gz") || !(PLUGIN_CLIENTS as readonly string[]).includes(client)) throw notFound("Plugin");
-    res.setHeader("content-disposition", `attachment; filename="flowboard-${client}.tar.gz"`);
+    res.setHeader("content-disposition", `attachment; filename="mixedlane-${client}.tar.gz"`);
     return res.type("application/gzip").send(tarGz(this.plugins.bundle(client, urls)));
   }
 }

@@ -1,4 +1,4 @@
-import type { AuthResponse } from "@flowboard/shared";
+import type { AuthResponse } from "@mixedlane/shared";
 
 /**
  * Client-side session state. The access token lives only in memory (never localStorage, so XSS
@@ -85,7 +85,7 @@ export function refreshSession(): Promise<AuthResponse | null> {
         const res = await fetch("/api/auth/refresh", {
           method: "POST",
           credentials: "same-origin",
-          headers: { "x-requested-with": "flowboard" },
+          headers: { "x-requested-with": "mixedlane" },
         });
         if (res.ok && res.status !== 204) {
           const s = (await res.json()) as AuthResponse;

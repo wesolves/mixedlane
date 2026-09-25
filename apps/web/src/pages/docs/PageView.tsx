@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { AlertTriangle, ChevronRight, FilePlus2, History, Link2, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { PageDetail } from "@flowboard/shared";
+import type { PageDetail } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

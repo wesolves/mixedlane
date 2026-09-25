@@ -14,7 +14,7 @@ const methodNotAllowed = { jsonrpc: "2.0", error: { code: -32000, message: "Meth
 
 /**
  * Remote MCP endpoint (Streamable HTTP, stateless) at /api/mcp.
- * Authenticate with an agent API key: `Authorization: Bearer fb_…`.
+ * Authenticate with an agent API key: `Authorization: Bearer ml_…`.
  */
 @ApiExcludeController()
 @Controller("mcp")

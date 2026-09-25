@@ -52,7 +52,7 @@ export class ErrorFilter implements ExceptionFilter {
         const origin = `${req.protocol}://${req.get("host")}`;
         res.setHeader(
           "WWW-Authenticate",
-          `Bearer realm="flowboard", resource_metadata="${origin}/.well-known/oauth-protected-resource/api/mcp", error="invalid_token", error_description="Sign in with OAuth, or send an agent API key: Authorization: Bearer fb_..."`,
+          `Bearer realm="mixedlane", resource_metadata="${origin}/.well-known/oauth-protected-resource/api/mcp", error="invalid_token", error_description="Sign in with OAuth, or send an agent API key: Authorization: Bearer ml_..."`,
         );
       }
       return res.status(err.status).json({ error: err.message });

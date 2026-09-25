@@ -34,18 +34,18 @@ afterAll(async () => {
 
 describe("discovery", () => {
   it("points unauthenticated MCP clients at the OAuth metadata", async () => {
-    const res = await ctx.http().post("/api/mcp").set("host", "flowboard.test").send({ jsonrpc: "2.0", id: 1, method: "tools/list" });
+    const res = await ctx.http().post("/api/mcp").set("host", "mixedlane.test").send({ jsonrpc: "2.0", id: 1, method: "tools/list" });
     expect(res.status).toBe(401);
-    expect(res.headers["www-authenticate"]).toContain('resource_metadata="http://flowboard.test/.well-known/oauth-protected-resource/api/mcp"');
+    expect(res.headers["www-authenticate"]).toContain('resource_metadata="http://mixedlane.test/.well-known/oauth-protected-resource/api/mcp"');
 
-    const prm = await ctx.http().get("/.well-known/oauth-protected-resource/api/mcp").set("host", "flowboard.test");
-    expect(prm.body).toMatchObject({ resource: "http://flowboard.test/api/mcp", authorization_servers: ["http://flowboard.test"] });
+    const prm = await ctx.http().get("/.well-known/oauth-protected-resource/api/mcp").set("host", "mixedlane.test");
+    expect(prm.body).toMatchObject({ resource: "http://mixedlane.test/api/mcp", authorization_servers: ["http://mixedlane.test"] });
 
-    const as = await ctx.http().get("/.well-known/oauth-authorization-server").set("host", "flowboard.test");
+    const as = await ctx.http().get("/.well-known/oauth-authorization-server").set("host", "mixedlane.test");
     expect(as.body).toMatchObject({
-      issuer: "http://flowboard.test",
-      token_endpoint: "http://flowboard.test/api/oauth/token",
-      registration_endpoint: "http://flowboard.test/api/oauth/register",
+      issuer: "http://mixedlane.test",
+      token_endpoint: "http://mixedlane.test/api/oauth/token",
+      registration_endpoint: "http://mixedlane.test/api/oauth/register",
       code_challenge_methods_supported: ["S256"],
     });
     expect(as.body.authorization_endpoint).toMatch(/\/oauth\/authorize$/);
@@ -85,7 +85,7 @@ describe("authorization code flow", () => {
       .send({ grant_type: "authorization_code", code: codeFrom(approved.body.redirect), code_verifier: verifier, client_id: clientId, redirect_uri: REDIRECT });
     expect(token.status).toBe(200);
     expect(token.headers["cache-control"]).toBe("no-store");
-    expect(token.body).toMatchObject({ token_type: "Bearer", access_token: expect.stringMatching(/^fb_/) });
+    expect(token.body).toMatchObject({ token_type: "Bearer", access_token: expect.stringMatching(/^ml_/) });
 
     // The token works on MCP with exactly the new agent's access.
     const tools = await ctx

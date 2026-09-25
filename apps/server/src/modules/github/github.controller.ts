@@ -8,7 +8,7 @@ import {
   githubSettingsSchema,
   linkRepoSchema,
   type GitAutomation,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import type { z } from "zod";
 import { Ctx, Public, type RequestContext } from "../../core/context";
 import { ZodPipe } from "../../core/http";

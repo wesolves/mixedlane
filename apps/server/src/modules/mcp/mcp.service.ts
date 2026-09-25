@@ -12,7 +12,7 @@ import {
   type ProjectPermission,
   type StatusDef,
   type WorkItemSummary,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { config } from "../../core/config";
 import type { RequestContext } from "../../core/context";
 import { AppError } from "../../core/http";
@@ -25,7 +25,7 @@ import { ItemsService } from "../work/items.service";
 import { ProjectsService, isUuid, type ProjectRow } from "../work/projects.service";
 import { PlanningService } from "./planning.service";
 
-const INSTRUCTIONS = `Flowboard is a project tracker (projects → epics → milestones → stories → tasks → subtasks) with Kanban boards and Confluence-style docs.
+const INSTRUCTIONS = `Mixedlane is a project tracker (projects → epics → milestones → stories → tasks → subtasks) with Kanban boards and Confluence-style docs.
 
 - Work items are referenced by key, e.g. "APP-0012" (zero padding optional: "APP-12").
 - Statuses are per project: call list_projects (or get_project) first to learn each project's statuses and enabled item types.
@@ -164,7 +164,7 @@ export class McpService {
   /* ---------- Server ---------- */
 
   build(ctx: RequestContext): McpServer {
-    const server = new McpServer({ name: "flowboard", title: "Flowboard", version: "1.0.0" }, { instructions: INSTRUCTIONS + this.planning.instructions(ctx) });
+    const server = new McpServer({ name: "mixedlane", title: "Mixedlane", version: "1.0.0" }, { instructions: INSTRUCTIONS + this.planning.instructions(ctx) });
 
     server.registerTool(
       "whoami",
@@ -229,7 +229,7 @@ export class McpService {
       {
         title: "Create project",
         description:
-          "Create a new Flowboard project when the work doesn't belong to an existing one (check list_projects first). You get full access to projects you create. Only works if an org admin allowed this agent to create projects.",
+          "Create a new Mixedlane project when the work doesn't belong to an existing one (check list_projects first). You get full access to projects you create. Only works if an org admin allowed this agent to create projects.",
         inputSchema: {
           name: z.string().min(1).max(120),
           key: z.string().regex(/^[A-Za-z][A-Za-z0-9]{1,4}$/).describe("2-5 letters/digits, starting with a letter, e.g. MKA. Becomes the item key prefix (MKA-0001)"),
@@ -465,8 +465,8 @@ export class McpService {
     server.registerPrompt(
       "plan",
       {
-        title: "Plan in Flowboard",
-        description: "Break requirements down into Flowboard epics, stories and tasks",
+        title: "Plan in Mixedlane",
+        description: "Break requirements down into Mixedlane epics, stories and tasks",
         argsSchema: { requirements: z.string().optional().describe("What to plan (leave empty to use the current conversation)") },
       },
       ({ requirements }) => ({
@@ -476,8 +476,8 @@ export class McpService {
             content: {
               type: "text",
               text: [
-                "Plan the following work and record it in Flowboard, following the Flowboard planning workflow in your instructions.",
-                "1. Find the project (.flowboard.json in the repo, or list_projects) and check its enabled item types and statuses with get_project.",
+                "Plan the following work and record it in Mixedlane, following the Mixedlane planning workflow in your instructions.",
+                "1. Find the project (.mixedlane.json in the repo, or list_projects) and check its enabled item types and statuses with get_project.",
                 "2. search_items to find anything that already exists.",
                 "3. Break it down: epic → (milestone) → user stories with acceptance criteria → implementation tasks.",
                 "4. Call create_plan, then list the item keys.",
@@ -492,14 +492,14 @@ export class McpService {
 
     server.registerPrompt(
       "sync",
-      { title: "Sync work to Flowboard", description: "Update Flowboard with what was done in this session" },
+      { title: "Sync work to Mixedlane", description: "Update Mixedlane with what was done in this session" },
       () => ({
         messages: [
           {
             role: "user",
             content: {
               type: "text",
-              text: "Bring Flowboard up to date with this session: start_work / complete_work the items you worked on, add_comment with decisions or blockers, and use create_plan for any work that isn't tracked yet. Finish with a short list of the keys you touched and their status.",
+              text: "Bring Mixedlane up to date with this session: start_work / complete_work the items you worked on, add_comment with decisions or blockers, and use create_plan for any work that isn't tracked yet. Finish with a short list of the keys you touched and their status.",
             },
           },
         ],
@@ -653,7 +653,7 @@ export class McpService {
 
     server.registerResource(
       "work-item",
-      new ResourceTemplate("flowboard://items/{key}", { list: undefined }),
+      new ResourceTemplate("mixedlane://items/{key}", { list: undefined }),
       { title: "Work item", description: "A work item as JSON (fields, Markdown description, children, comments)", mimeType: "application/json" },
       async (uri, { key }) => ({
         contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(await this.itemDetail(ctx, String(key)), null, 2) }],
@@ -662,7 +662,7 @@ export class McpService {
 
     server.registerResource(
       "board",
-      new ResourceTemplate("flowboard://projects/{project}/board", { list: undefined }),
+      new ResourceTemplate("mixedlane://projects/{project}/board", { list: undefined }),
       { title: "Project board", description: "A project's items grouped by status column", mimeType: "application/json" },
       async (uri, { project }) => {
         const { project: p } = await this.access.project(ctx, String(project), "project.read");

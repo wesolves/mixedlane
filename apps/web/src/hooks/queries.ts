@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { GitAutomation, ItemCreate, ItemMove, ItemUpdate, ProjectCreate, ProjectUpdate, WorkItemSummary } from "@flowboard/shared";
+import type { GitAutomation, ItemCreate, ItemMove, ItemUpdate, ProjectCreate, ProjectUpdate, WorkItemSummary } from "@mixedlane/shared";
 import { api } from "@/lib/api";
 
 export const qk = {

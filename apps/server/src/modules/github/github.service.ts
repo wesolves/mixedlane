@@ -7,7 +7,7 @@ import {
   type DevelopmentInfo,
   type DevPullRequest,
   type GitHubRepoOption,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { AppError } from "../../core/http";
 import { JobsService } from "../../core/jobs/jobs.service";
 import { ItemsService } from "../work/items.service";

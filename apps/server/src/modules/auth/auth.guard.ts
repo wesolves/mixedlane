@@ -1,7 +1,7 @@
 import { Injectable, type CanActivate, type ExecutionContext } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
-import { ORG_ROLE_PERMISSIONS } from "@flowboard/shared";
+import { ORG_ROLE_PERMISSIONS } from "@mixedlane/shared";
 import { NO_ORG, PUBLIC } from "../../core/context";
 import { AppError } from "../../core/http";
 import { AgentsService, isApiKey } from "../agents/agents.service";
@@ -12,7 +12,7 @@ import { verifyAccessToken } from "./crypto";
 /**
  * Global guard:
  *  1. Authenticates `Authorization: Bearer <jwt>` (session must still exist → instant logout), or
- *     an AI agent's API key (`Bearer fb_…`), which is bound to one org and only reaches org routes.
+ *     an AI agent's API key (`Bearer ml_…`), which is bound to one org and only reaches org routes.
  *  2. For org-scoped routes, resolves `X-Org: <slug|id>` and the caller's membership, building
  *     the RequestContext every service uses. Non-members get 404 so orgs can't be probed.
  * Routes opt out with @Public() (no auth) or @NoOrg() (auth, no org).

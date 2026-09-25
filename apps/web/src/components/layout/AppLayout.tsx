@@ -21,7 +21,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ORG_ROLE_LABELS, SESSION_DAY_OPTIONS } from "@flowboard/shared";
+import { ORG_ROLE_LABELS, SESSION_DAY_OPTIONS } from "@mixedlane/shared";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -361,7 +361,7 @@ function AccountDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              You stay signed in on each device until you haven't used Flowboard for this long (it renews every time you use it). Applies from your next token
+              You stay signed in on each device until you haven't used Mixedlane for this long (it renews every time you use it). Applies from your next token
               refresh.
             </p>
           </div>
@@ -381,7 +381,7 @@ function OfflineBanner() {
   if (!offline) return null;
   return (
     <div className="flex items-center gap-2 border-b bg-muted px-6 py-1.5 text-xs text-muted-foreground">
-      <WifiOff className="size-3.5" /> Reconnecting to Flowboard… you're still signed in; changes will load when it's back.
+      <WifiOff className="size-3.5" /> Reconnecting to Mixedlane… you're still signed in; changes will load when it's back.
     </div>
   );
 }

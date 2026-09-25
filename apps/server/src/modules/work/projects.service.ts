@@ -8,7 +8,7 @@ import {
   type ProjectCreate,
   type ProjectUpdate,
   type StatusDef,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import type { RequestContext } from "../../core/context";
 import { DB, type Db } from "../../core/database/database";
 import { EventBus } from "../../core/events";

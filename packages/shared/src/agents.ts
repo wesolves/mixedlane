@@ -36,7 +36,7 @@ export const DEFAULT_AGENT_PERMISSIONS: AgentPermission[] = ["project.read", "it
 export const AGENT_PLANNING_MODES = ["auto", "propose"] as const;
 export type AgentPlanningMode = (typeof AGENT_PLANNING_MODES)[number];
 export const AGENT_PLANNING_MODE_LABELS: Record<AgentPlanningMode, { label: string; hint: string }> = {
-  auto: { label: "Create items automatically", hint: "Right after it plans, the agent adds the epics, stories and tasks to Flowboard" },
+  auto: { label: "Create items automatically", hint: "Right after it plans, the agent adds the epics, stories and tasks to Mixedlane" },
   propose: { label: "Propose first, then create", hint: "The agent shows the breakdown and only creates items after you confirm" },
 };
 
@@ -76,7 +76,7 @@ export type AgentUpdate = z.input<typeof agentUpdateSchema>;
 export interface ApiKeyInfo {
   id: string;
   name: string;
-  /** Visible identifier, e.g. fb_3f9a1c2b7d4e */
+  /** Visible identifier, e.g. ml_3f9a1c2b7d4e */
   prefix: string;
   createdAt: string;
   lastUsedAt: string | null;

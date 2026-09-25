@@ -1,4 +1,4 @@
-# Flowboard
+# Mixedlane
 
 A simpler, friendlier Jira-style tracker.
 
@@ -18,7 +18,7 @@ It also has:
 | Server (`apps/server`) | NestJS (Express), Drizzle ORM, Postgres — embedded PGlite in dev, real Postgres in prod; DB-backed job queue |
 | Shared (`packages/shared`) | Zod schemas, types and hierarchy rules used by both sides |
 
-This is one npm package with a single `node_modules`. The project drive is FAT32, which can't create the symlinks npm workspaces need. `@flowboard/shared` is resolved through path aliases (`tsconfig` `paths`, Vite `resolve.alias`, and SWC for the server).
+This is one npm package with a single `node_modules`. The project drive is FAT32, which can't create the symlinks npm workspaces need. `@mixedlane/shared` is resolved through path aliases (`tsconfig` `paths`, Vite `resolve.alias`, and SWC for the server).
 
 How the server runs TypeScript:
 - **In development:** directly through SWC (`@swc-node/register`), which emits the decorator metadata NestJS needs.
@@ -45,7 +45,7 @@ Other scripts:
 - `npm run db:generate`: a new migration after editing `apps/server/src/core/database/schema.ts`.
 
 **Database**
-- **Dev:** embedded PGlite (real Postgres compiled to WASM) at `~/.flowboard/pgdata`. Override with `PGLITE_DIR`.
+- **Dev:** embedded PGlite (real Postgres compiled to WASM) at `~/.mixedlane/pgdata`. Override with `PGLITE_DIR`.
   - It lives in your home folder because PGlite can't store data on FAT32/exFAT drives.
   - PGlite is single-process, so only the dev server may open it. A lock file prevents accidents; use `npm run seed:reset` (an HTTP call) rather than scripts.
 - **Prod:** set `DATABASE_URL` to a Postgres connection string.
@@ -55,15 +55,15 @@ Other scripts:
 
 **API docs (Swagger):** http://localhost:3001/api/docs. Sign in with `POST /api/auth/login`, click **Authorize**, paste the `accessToken`, and set the `X-Org` header (e.g. `demo`).
 
-**Demo accounts (dev):** all use the password `Flowboard123`.
+**Demo accounts (dev):** all use the password `Mixedlane123`.
 
 | Email | Org role | Notes |
 | --- | --- | --- |
-| alice@flowboard.dev | Owner | |
-| bob@flowboard.dev | Admin | |
-| priya@flowboard.dev | Member | Mobile team lead |
-| sam@flowboard.dev | Member | Mobile team |
-| guest@flowboard.dev | Guest | Viewer on WEB only |
+| alice@mixedlane.dev | Owner | |
+| bob@mixedlane.dev | Admin | |
+| priya@mixedlane.dev | Member | Mobile team lead |
+| sam@mixedlane.dev | Member | Mobile team |
+| guest@mixedlane.dev | Guest | Viewer on WEB only |
 
 The demo also has an AI agent, **Triage Bot**, with access to APP. Its API key is written to `apps/server/data/demo-agent.key` on each seed, so you can connect an MCP client right away (see [AI agents & MCP](#ai-agents--mcp)).
 
@@ -179,13 +179,13 @@ Agents are first-class members of an organization, with their own identity.
 - Teammates get live toasts ("🤖 Triage Bot moved APP-0012"), and assignees get notifications.
 - Each agent's settings page shows its recent activity.
 
-**MCP server:** at **`/api/mcp`** (Streamable HTTP, stateless). Authenticate with `Authorization: Bearer fb_…`.
+**MCP server:** at **`/api/mcp`** (Streamable HTTP, stateless). Authenticate with `Authorization: Bearer ml_…`.
 
 | Tools | |
 | --- | --- |
 | Work | `whoami`, `list_projects`, `get_project`, `search_items`, `get_item`, `create_item`, `update_item`, `move_item`, `delete_item`, `add_comment`, `list_members` |
 | Docs | `list_spaces`, `search_docs`, `get_page`, `create_page`, `update_page` (sends the version it read, so conflicting edits are rejected rather than overwritten) |
-| Resources | `flowboard://items/{key}`, `flowboard://projects/{key}/board` |
+| Resources | `mixedlane://items/{key}`, `mixedlane://projects/{key}/board` |
 
 How the tools behave:
 - Descriptions, comments and pages are **Markdown** in and out.
@@ -193,7 +193,7 @@ How the tools behave:
 - Every tool goes through the same services and permission checks as the REST API.
 - A denied action comes back as a readable tool error.
 
-**Agent plugins (recommended).** Settings → AI agents → an agent → Connect → **Install plugin**. Flowboard serves a plugin for each tool with this server's URL baked in, installed by a one-liner:
+**Agent plugins (recommended).** Settings → AI agents → an agent → Connect → **Install plugin**. Mixedlane serves a plugin for each tool with this server's URL baked in, installed by a one-liner:
 
 ```bash
 curl -fsSL http://<host>/api/plugins/install.sh | sh -s -- claude-code        # or codex | copilot | opencode | pi
@@ -202,43 +202,43 @@ curl -fsSL http://<host>/api/plugins/install.sh | sh -s -- claude-code        # 
 
 | Plugin | Contents | Install does |
 | --- | --- | --- |
-| Claude Code | MCP (OAuth), 4 skills, `flowboard-planner` agent, hooks (`SessionStart`, planning prompts, `PostToolUse` on `ExitPlanMode`), `/flowboard:plan · sync · start · done · init` | `claude plugin marketplace add` + `claude plugin install flowboard@flowboard` |
-| Codex | MCP (OAuth), 4 skills, hooks (`SessionStart`, `UserPromptSubmit`) | `codex plugin marketplace add` + `codex plugin add flowboard@flowboard` |
+| Claude Code | MCP (OAuth), 4 skills, `mixedlane-planner` agent, hooks (`SessionStart`, planning prompts, `PostToolUse` on `ExitPlanMode`), `/mixedlane:plan · sync · start · done · init` | `claude plugin marketplace add` + `claude plugin install mixedlane@mixedlane` |
+| Codex | MCP (OAuth), 4 skills, hooks (`SessionStart`, `UserPromptSubmit`) | `codex plugin marketplace add` + `codex plugin add mixedlane@mixedlane` |
 | Copilot (CLI + VS Code) | MCP (OAuth), 4 skills, planner agent, `sessionStart` hook | `copilot plugin install` (VS Code reads Copilot CLI's plugins) |
-| opencode | MCP (OAuth), 4 skills, planner subagent, plugin (rules in the system prompt, mirrors `todowrite` plans), `/flowboard-plan` | copies into `~/.config/opencode`, merges `opencode.json` (backup kept) |
-| Pi | MCP via `pi-mcp-adapter` (API key in `FLOWBOARD_API_KEY`), 4 skills, extension (rules in the system prompt), `/flowboard-plan` | `pi install npm:pi-mcp-adapter` + `pi install <dir>` |
+| opencode | MCP (OAuth), 4 skills, planner subagent, plugin (rules in the system prompt, mirrors `todowrite` plans), `/mixedlane-plan` | copies into `~/.config/opencode`, merges `opencode.json` (backup kept) |
+| Pi | MCP via `pi-mcp-adapter` (API key in `MIXEDLANE_API_KEY`), 4 skills, extension (rules in the system prompt), `/mixedlane-plan` | `pi install npm:pi-mcp-adapter` + `pi install <dir>` |
 
-Skills: **flowboard-planning** (plans/requirements → epic → milestone → story (acceptance criteria) → task), **flowboard-work-tracking** (`start_work` → keys in branches/commits → `complete_work`), **flowboard-docs**, **flowboard-init** (writes `.flowboard.json` so every tool uses the same project). Re-run the installer to update; `--uninstall` / `-Uninstall` removes it. Verified end to end: a plain “make a plan for X” prompt in Claude Code, Codex and opencode created the epic/stories/tasks in the linked project.
+Skills: **mixedlane-planning** (plans/requirements → epic → milestone → story (acceptance criteria) → task), **mixedlane-work-tracking** (`start_work` → keys in branches/commits → `complete_work`), **mixedlane-docs**, **mixedlane-init** (writes `.mixedlane.json` so every tool uses the same project). Re-run the installer to update; `--uninstall` / `-Uninstall` removes it. Verified end to end: a plain “make a plan for X” prompt in Claude Code, Codex and opencode created the epic/stories/tasks in the linked project.
 
 **Per-agent settings** (agent page): **Can create projects** (on by default — the agent gets full access to projects it creates) and **When it plans work**: *Create items automatically* (default) or *Propose first* (`create_plan` returns a preview until the user confirms). Denied actions name the exact setting to change.
 
 **Planning tools:** `create_plan` (a whole tree in one call, validated against the project's hierarchy first, idempotent — re-running reuses existing items), `create_project`, `start_work`, `complete_work`; MCP prompts `plan` and `sync`.
 
 **Two ways to connect**
-- **Browser sign-in (OAuth 2.1).** Add just the URL; the client discovers Flowboard's OAuth metadata (`/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server`), registers itself (dynamic client registration) and opens a browser. An org owner/admin signs in, picks the agent to act as — or creates one with access to chosen projects — and clicks **Allow**. The client receives an agent API key named “OAuth · <client>”, revocable from the agent's page like any other key. PKCE (S256) is required and codes are single-use. Verified with opencode and an MCP-SDK client (the flow Copilot CLI / Claude Code use).
-- **API key.** Create a key on the agent's page and send `Authorization: Bearer fb_…`.
+- **Browser sign-in (OAuth 2.1).** Add just the URL; the client discovers Mixedlane's OAuth metadata (`/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server`), registers itself (dynamic client registration) and opens a browser. An org owner/admin signs in, picks the agent to act as — or creates one with access to chosen projects — and clicks **Allow**. The client receives an agent API key named “OAuth · <client>”, revocable from the agent's page like any other key. PKCE (S256) is required and codes are single-use. Verified with opencode and an MCP-SDK client (the flow Copilot CLI / Claude Code use).
+- **API key.** Create a key on the agent's page and send `Authorization: Bearer ml_…`.
 
 **Connecting a client.** The agent's settings page (**Connect**) has a ready-to-paste setup for each of these, with your server URL filled in:
 
 | Client | How it connects | Tested here |
 | --- | --- | --- |
-| **Claude Code** | `claude mcp add --transport http flowboard <url> --header "Authorization: Bearer fb_…"` | ✅ |
+| **Claude Code** | `claude mcp add --transport http mixedlane <url> --header "Authorization: Bearer ml_…"` | ✅ |
 | **Claude Desktop** | `claude_desktop_config.json`, bridged by `npx mcp-remote` | |
-| **OpenAI Codex** (CLI / IDE) | `codex mcp add flowboard --url <url> --bearer-token-env-var FLOWBOARD_API_KEY`, or `[mcp_servers.flowboard]` in `~/.codex/config.toml` | ✅ called `whoami` and `list_projects` over the LAN |
-| **GitHub Copilot** (VS Code agent mode) | `.vscode/mcp.json`: an `http` server with `"Authorization": "Bearer ${input:flowboard-key}"`; VS Code prompts for the key once | |
-| **GitHub Copilot CLI** | `copilot mcp add --transport http --header "Authorization: Bearer fb_…" flowboard <url>`, or `~/.copilot/mcp-config.json` | |
-| **opencode** | `opencode.json` → `mcp.flowboard` with `"type": "remote"`, `"oauth": false`, and `"Authorization": "Bearer {env:FLOWBOARD_API_KEY}"` | ✅ `opencode mcp list` shows it connected |
-| **Pi** | No built-in MCP support. Install `pi install npm:pi-mcp-adapter`, then add `{ "url": "<url>", "auth": "bearer", "bearerToken": "${FLOWBOARD_API_KEY}" }` to `~/.config/mcp/mcp.json` | |
+| **OpenAI Codex** (CLI / IDE) | `codex mcp add mixedlane --url <url> --bearer-token-env-var MIXEDLANE_API_KEY`, or `[mcp_servers.mixedlane]` in `~/.codex/config.toml` | ✅ called `whoami` and `list_projects` over the LAN |
+| **GitHub Copilot** (VS Code agent mode) | `.vscode/mcp.json`: an `http` server with `"Authorization": "Bearer ${input:mixedlane-key}"`; VS Code prompts for the key once | |
+| **GitHub Copilot CLI** | `copilot mcp add --transport http --header "Authorization: Bearer ml_…" mixedlane <url>`, or `~/.copilot/mcp-config.json` | |
+| **opencode** | `opencode.json` → `mcp.mixedlane` with `"type": "remote"`, `"oauth": false`, and `"Authorization": "Bearer {env:MIXEDLANE_API_KEY}"` | ✅ `opencode mcp list` shows it connected |
+| **Pi** | No built-in MCP support. Install `pi install npm:pi-mcp-adapter`, then add `{ "url": "<url>", "auth": "bearer", "bearerToken": "${MIXEDLANE_API_KEY}" }` to `~/.config/mcp/mcp.json` | |
 | Anything else | Any streamable-HTTP MCP client that can send an `Authorization` header | |
 
 - `<url>` is `http(s)://<host>/api/mcp`. In development either the API port (`:3001`) or the web port works.
-- Where the tool supports it (Codex, opencode, Pi), the setup reads the key from the `FLOWBOARD_API_KEY` env var so it doesn't end up in a config file.
+- Where the tool supports it (Codex, opencode, Pi), the setup reads the key from the `MIXEDLANE_API_KEY` env var so it doesn't end up in a config file.
 - Clients that send only `Accept: application/json` are accepted too.
 - Use one key per machine or tool, so each can be revoked on its own.
 
 Beyond MCP, agents can also use the same API key for:
 - **The REST API:** any org-scoped endpoint; the key already names its org.
-- **The realtime socket:** `io({ path: "/api/socket", auth: { token: "fb_…" } })` to react to changes live.
+- **The realtime socket:** `io({ path: "/api/socket", auth: { token: "ml_…" } })` to react to changes live.
 
 ## Docs
 
@@ -292,14 +292,14 @@ Keys are case-insensitive and zero-padding is optional: `app-12` matches `APP-00
   - An Actions workflow run succeeding on the default branch (matched by workflow name)
   - A release being published (matched by tag, e.g. `v*`; pre-releases are skipped)
 
-  To find the items, Flowboard compares the deployed commit with the previous successful deploy on the same line. For the very first deploy, it checks which merged PRs are ancestors of the deployed commit.
+  To find the items, Mixedlane compares the deployed commit with the previous successful deploy on the same line. For the very first deploy, it checks which merged PRs are ancestors of the deployed commit.
 - **Only move forward** (default on): items never move back to an earlier status.
 - **Smart commits:** `APP-0012 #comment Fixed it #done` adds a comment and moves the item. Any status name or id works as a command, e.g. `#in-review`.
 - The activity log records every automatic change, e.g. "GitHub · PR #12 merged" or "GitHub · deployed to production".
 
 ### Delivery
 - **Polling** (default, works on localhost): every linked repo is checked on an interval you set (30 s to 15 min). Use **Sync now** to force a check.
-- **Webhooks** (instant): set a public URL, e.g. from `cloudflared tunnel --url http://localhost:3001`. Flowboard registers the webhook itself when the token allows it; otherwise the page shows the URL and secret for manual setup. Signatures are verified with HMAC SHA-256.
+- **Webhooks** (instant): set a public URL, e.g. from `cloudflared tunnel --url http://localhost:3001`. Mixedlane registers the webhook itself when the token allows it; otherwise the page shows the URL and secret for manual setup. Signatures are verified with HMAC SHA-256.
 - Both paths feed one processor, which stores the last known state of every PR and deploy. An automation fires only on a real change, so duplicate deliveries, replays and polling overlap are safe.
 
 ## Using it
@@ -395,7 +395,7 @@ docker compose --profile s3 up -d --build
 ```
 
 - **HTTPS:** put any TLS proxy (Caddy, Traefik, a cloud load balancer) in front of `web`, set `APP_URL=https://…` (turns on Secure cookies + HSTS) and `TRUST_PROXY=2`. nginx passes the proxy's `X-Forwarded-Proto` through.
-- **Single container instead:** `docker build -t flowboard .` builds the default `app` target — the api also serving the UI (`WEB_DIST`) — and needs only `DATABASE_URL` plus the secrets.
+- **Single container instead:** `docker build -t mixedlane .` builds the default `app` target — the api also serving the UI (`WEB_DIST`) — and needs only `DATABASE_URL` plus the secrets.
 - **Verified:** the compose stack was built and smoke-tested through nginx only: health, SPA deep links, strict CSP (no violations in the browser), register/refresh cookie, uploads, WebSocket realtime, OAuth discovery and plugin installers on the public URL, and an agent creating a project and a plan over MCP with the team seeing it live.
 
 **Build and startup**

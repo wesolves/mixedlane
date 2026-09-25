@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, FolderKanban, Loader2, MailCheck } from "lucide-react";
-import { ORG_ROLE_LABELS } from "@flowboard/shared";
+import { ORG_ROLE_LABELS } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,7 @@ function AuthShell({ title, subtitle, children, footer }: { title: string; subti
           <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
             <FolderKanban className="size-5" />
           </div>
-          <span className="text-lg font-semibold tracking-tight">Flowboard</span>
+          <span className="text-lg font-semibold tracking-tight">Mixedlane</span>
         </div>
         <div className="rounded-2xl border bg-card p-6 shadow-sm">
           <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
@@ -98,7 +98,7 @@ export function LoginPage() {
   return (
     <AuthShell
       title="Welcome back"
-      subtitle="Sign in to your Flowboard workspace."
+      subtitle="Sign in to your Mixedlane workspace."
       footer={
         <>
           New here?{" "}
@@ -129,7 +129,7 @@ export function LoginPage() {
         </Button>
         {import.meta.env.DEV && (
           <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-            Demo: <code>alice@flowboard.dev</code> / <code>Flowboard123</code> (also bob, priya, sam, guest)
+            Demo: <code>alice@mixedlane.dev</code> / <code>Mixedlane123</code> (also bob, priya, sam, guest)
           </p>
         )}
       </form>

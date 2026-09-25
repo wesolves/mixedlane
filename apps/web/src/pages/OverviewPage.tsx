@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { CalendarClock, CircleCheck, CircleDot, ListTodo } from "lucide-react";
-import { TYPE_LABELS, TYPE_PLURALS, defaultChildType } from "@flowboard/shared";
+import { TYPE_LABELS, TYPE_PLURALS, defaultChildType } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { EmptyState, StatusIcon, TypeIcon } from "@/components/common";
 import { DueDate, ItemCard, ItemRow, QuickAdd } from "@/components/item/ItemViews";

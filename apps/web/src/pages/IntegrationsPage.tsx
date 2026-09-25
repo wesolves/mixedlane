@@ -24,7 +24,7 @@ const TOKEN_PERMISSIONS: [string, string][] = [
   ["Contents", "Read (Read & write to create branches from items)"],
   ["Deployments", "Read"],
   ["Actions", "Read"],
-  ["Webhooks", "Read & write (optional — lets Flowboard register webhooks for you)"],
+  ["Webhooks", "Read & write (optional — lets Mixedlane register webhooks for you)"],
 ];
 
 /** Rendered inside Organization settings → Integrations (`embedded`), or standalone. */
@@ -218,7 +218,7 @@ function Connected() {
             size="sm"
             className="ml-auto text-destructive hover:bg-destructive/10"
             onClick={async () => {
-              if (!confirm("Disconnect GitHub? Linked repos stay configured, but syncing stops and Flowboard-created webhooks are removed.")) return;
+              if (!confirm("Disconnect GitHub? Linked repos stay configured, but syncing stops and Mixedlane-created webhooks are removed.")) return;
               await disconnect.mutateAsync(undefined);
               toast.success("GitHub disconnected");
             }}

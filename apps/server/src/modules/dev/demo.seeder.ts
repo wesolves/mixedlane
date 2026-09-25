@@ -1,6 +1,6 @@
 import { Controller, HttpCode, Inject, Injectable, Logger, Module, Post, type OnApplicationBootstrap } from "@nestjs/common";
 import { sql } from "drizzle-orm";
-import { DEFAULT_AGENT_PERMISSIONS, STATUS_PRESETS, type ItemType, type Priority } from "@flowboard/shared";
+import { DEFAULT_AGENT_PERMISSIONS, STATUS_PRESETS, type ItemType, type Priority } from "@mixedlane/shared";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { SERVER_ROOT, config } from "../../core/config";
@@ -34,13 +34,13 @@ interface Node {
 const SEED: Actor = { type: "system", id: null, name: "Seed" };
 
 /** Demo accounts (development only). Everyone shares DEMO_PASSWORD. */
-export const DEMO_PASSWORD = "Flowboard123";
+export const DEMO_PASSWORD = "Mixedlane123";
 export const DEMO_USERS = [
-  { key: "alice", name: "Alice Owner", email: "alice@flowboard.dev", role: "owner" },
-  { key: "bob", name: "Bob Admin", email: "bob@flowboard.dev", role: "admin" },
-  { key: "priya", name: "Priya", email: "priya@flowboard.dev", role: "member" },
-  { key: "sam", name: "Sam", email: "sam@flowboard.dev", role: "member" },
-  { key: "gina", name: "Gina Guest", email: "guest@flowboard.dev", role: "guest" },
+  { key: "alice", name: "Alice Owner", email: "alice@mixedlane.dev", role: "owner" },
+  { key: "bob", name: "Bob Admin", email: "bob@mixedlane.dev", role: "admin" },
+  { key: "priya", name: "Priya", email: "priya@mixedlane.dev", role: "member" },
+  { key: "sam", name: "Sam", email: "sam@mixedlane.dev", role: "member" },
+  { key: "gina", name: "Gina Guest", email: "guest@mixedlane.dev", role: "guest" },
 ] as const;
 
 const APP_TREE: Node[] = [
@@ -180,7 +180,7 @@ export class DemoSeeder implements OnApplicationBootstrap {
   }
 
   async seed() {
-    const [org] = await this.db.insert(orgs).values({ name: "Flowboard Demo", slug: "demo" }).returning();
+    const [org] = await this.db.insert(orgs).values({ name: "Mixedlane Demo", slug: "demo" }).returning();
     const passwordHash = await hashPassword(DEMO_PASSWORD);
     const people: Record<string, Actor> = {};
     for (const u of DEMO_USERS) {
@@ -202,7 +202,7 @@ export class DemoSeeder implements OnApplicationBootstrap {
     this.person = person;
 
     const app = await this.projects.create(org.id, {
-      name: "Flowboard Mobile App",
+      name: "Mixedlane Mobile App",
       key: "APP",
       description: "Ship the first version of our mobile companion app.",
       color: "#6366f1",
@@ -226,7 +226,7 @@ export class DemoSeeder implements OnApplicationBootstrap {
     await this.db.insert(projectAccess).values({ projectId: web.id, principalType: "user", principalId: people.gina.id!, role: "viewer" });
     await this.seedDocs(org.id, app.id, people);
     await this.seedAgent(org.id, app.id, people);
-    this.logger.log(`Seeded demo org (projects APP, WEB). Sign in as alice@flowboard.dev / ${DEMO_PASSWORD} (also bob, priya, sam, guest)`);
+    this.logger.log(`Seeded demo org (projects APP, WEB). Sign in as alice@mixedlane.dev / ${DEMO_PASSWORD} (also bob, priya, sam, guest)`);
   }
 
   private person: (name: string) => Actor = () => SEED;

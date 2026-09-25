@@ -1,6 +1,6 @@
 import { Controller, Delete, Get, Global, HttpCode, Module, Param, Patch, Post, Put } from "@nestjs/common";
 import { ApiBearerAuth, ApiHeader, ApiTags } from "@nestjs/swagger";
-import { agentCreateSchema, agentGrantSchema, agentUpdateSchema, apiKeyCreateSchema } from "@flowboard/shared";
+import { agentCreateSchema, agentGrantSchema, agentUpdateSchema, apiKeyCreateSchema } from "@mixedlane/shared";
 import type { z } from "zod";
 import { Ctx, type RequestContext } from "../../core/context";
 import { ZBody } from "../../core/zod-body";

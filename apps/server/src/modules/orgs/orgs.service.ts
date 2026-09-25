@@ -9,7 +9,7 @@ import {
   type OrgRole,
   type OrgSummary,
   type Team,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { config } from "../../core/config";
 import type { RequestContext } from "../../core/context";
 import { DB, type Db, type Executor } from "../../core/database/database";
@@ -296,7 +296,7 @@ export class OrgsService {
     await this.mail.send(
       actionEmail({
         to: email,
-        subject: `${ctx.actor.name} invited you to ${org.name} on Flowboard`,
+        subject: `${ctx.actor.name} invited you to ${org.name} on Mixedlane`,
         intro: `${ctx.actor.name} invited you to join ${org.name} as ${input.role}.`,
         action: "Accept invitation",
         url,

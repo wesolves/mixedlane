@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Globe2, Lock, Plus, Users, X } from "lucide-react";
 import { toast } from "sonner";
-import { AGENT_PERMISSION_LABELS, PROJECT_ROLES, PROJECT_ROLE_HINTS, PROJECT_ROLE_LABELS, type AgentPermission, type Project, type ProjectAccessOverview, type ProjectRole } from "@flowboard/shared";
+import { AGENT_PERMISSION_LABELS, PROJECT_ROLES, PROJECT_ROLE_HINTS, PROJECT_ROLE_LABELS, type AgentPermission, type Project, type ProjectAccessOverview, type ProjectRole } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";

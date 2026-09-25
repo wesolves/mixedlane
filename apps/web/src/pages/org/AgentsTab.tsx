@@ -14,7 +14,7 @@ import {
   type AgentDocAccess,
   type AgentPermission,
   type CreatedApiKey,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -350,7 +350,7 @@ export function ConnectSnippets({ secret }: { secret?: string }) {
       </ol>
       {usePlugin ? null : useOAuth ? (
         <p className="text-xs text-muted-foreground">
-          No key to copy: the client registers itself and you approve it in Flowboard. Its key (“OAuth · …”) then appears under the agent's API keys, where you can revoke it.
+          No key to copy: the client registers itself and you approve it in Mixedlane. Its key (“OAuth · …”) then appears under the agent's API keys, where you can revoke it.
         </p>
       ) : !secret && (
         <p className="text-xs text-muted-foreground">
@@ -460,7 +460,7 @@ function AgentSheet({ agent, onClose, onKey }: { agent: Agent; onClose: () => vo
             </label>
             <div className="rounded-xl border p-3">
               <p className="text-sm font-medium">When it plans work</p>
-              <p className="mb-2 text-xs text-muted-foreground">How it records plans and requirements as epics, stories and tasks in Flowboard.</p>
+              <p className="mb-2 text-xs text-muted-foreground">How it records plans and requirements as epics, stories and tasks in Mixedlane.</p>
               <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="When it plans work">
                 {AGENT_PLANNING_MODES.map((m) => (
                   <button

@@ -56,7 +56,7 @@ export async function openDatabase(opts: { url?: string; pgliteDir?: string } = 
  */
 function lockDir(dir: string): () => void {
   mkdirSync(dir, { recursive: true });
-  const lock = join(dir, "flowboard.lock");
+  const lock = join(dir, "mixedlane.lock");
   if (existsSync(lock)) {
     const pid = Number(readFileSync(lock, "utf8"));
     let alive = false;

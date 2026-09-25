@@ -21,7 +21,7 @@ const schema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).default(30),
   /** e.g. smtps://user:pass@smtp.example.com:465 — when unset, emails are printed to the console. */
   SMTP_URL: z.string().optional(),
-  MAIL_FROM: z.string().default("Flowboard <no-reply@flowboard.local>"),
+  MAIL_FROM: z.string().default("Mixedlane <no-reply@mixedlane.local>"),
   /** Requests per minute per IP on sensitive auth endpoints. */
   AUTH_RATE_LIMIT: z.coerce.number().int().min(1).default(20),
   /** Postgres connection string. When unset, an embedded PGlite database is used. */
@@ -30,7 +30,7 @@ const schema = z.object({
    * PGlite data directory. Defaults to the user's home folder because PGlite needs a filesystem
    * with POSIX semantics (FAT32/exFAT drives fail). Use "memory://" for throwaway databases.
    */
-  PGLITE_DIR: z.string().default(join(homedir(), ".flowboard", "pgdata")),
+  PGLITE_DIR: z.string().default(join(homedir(), ".mixedlane", "pgdata")),
   UPLOAD_DIR: z.string().default(join(SERVER_ROOT, "data", "uploads")),
   /** 64 hex chars; encrypts stored secrets (e.g. GitHub tokens). Generated on first run in dev. */
   SECRET_KEY: z.string().regex(/^[0-9a-f]{64}$/i).optional(),

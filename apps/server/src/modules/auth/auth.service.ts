@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, gt, inArray, isNull } from "drizzle-orm";
-import type { AuthResponse, AuthUser } from "@flowboard/shared";
+import type { AuthResponse, AuthUser } from "@mixedlane/shared";
 import { config } from "../../core/config";
 import { DB, type Db, type Executor } from "../../core/database/database";
 import { authTokens, sessions, teams, users } from "../../core/database/schema";
@@ -210,7 +210,7 @@ export class AuthService {
     await this.mail.send(
       actionEmail({
         to: user.email,
-        subject: "Confirm your email for Flowboard",
+        subject: "Confirm your email for Mixedlane",
         intro: `Hi ${user.name}, please confirm your email address.`,
         action: "Confirm email",
         url: `${config().APP_URL}/verify-email?token=${token}`,
@@ -236,7 +236,7 @@ export class AuthService {
     await this.mail.send(
       actionEmail({
         to: user.email,
-        subject: "Reset your Flowboard password",
+        subject: "Reset your Mixedlane password",
         intro: `Hi ${user.name}, someone asked to reset your password. The link works for one hour.`,
         action: "Choose a new password",
         url: `${config().APP_URL}/reset-password?token=${token}`,

@@ -8,7 +8,7 @@ const app = await createApp();
 const { PORT, HOST } = config();
 await app.listen(PORT, HOST);
 
-const log = new Logger("Flowboard");
+const log = new Logger("Mixedlane");
 log.log(`API on http://localhost:${PORT}/api`);
 // When listening on every interface, show the LAN addresses other devices can use.
 if (HOST === "0.0.0.0" || HOST === "::") {

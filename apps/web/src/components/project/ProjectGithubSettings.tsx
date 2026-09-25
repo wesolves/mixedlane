@@ -14,7 +14,7 @@ import {
   type GitTrigger,
   type LinkedRepo,
   type Project,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -362,7 +362,7 @@ function AutomationEditor({ project, saved }: { project: Project; saved: GitAuto
 
       <Section
         title="Deploy rules"
-        description="When code reaches an environment, move every item that shipped — Flowboard compares the deployed commit with the previous deploy to find them."
+        description="When code reaches an environment, move every item that shipped — Mixedlane compares the deployed commit with the previous deploy to find them."
       >
         <div className={cn("space-y-3", !draft.enabled && "pointer-events-none opacity-50")}>
           {draft.deployRules.length > 0 && (

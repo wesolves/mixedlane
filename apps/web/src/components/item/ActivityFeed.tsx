@@ -4,7 +4,7 @@ import {
   PRIORITY_LABELS,
   type Activity,
   type Priority,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { ActorAvatar, ActorName } from "@/components/common";
 import { useActivity } from "@/hooks/queries";
 import { useProjectScope } from "@/lib/project";

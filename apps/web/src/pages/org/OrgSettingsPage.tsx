@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { Bot, Building2, Check, Copy, Link2, LogOut, Mail, Plug, Plus, Trash2, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
-import { ORG_ROLES, ORG_ROLE_HINTS, ORG_ROLE_LABELS, type OrgRole, type Team } from "@flowboard/shared";
+import { ORG_ROLES, ORG_ROLE_HINTS, ORG_ROLE_LABELS, type OrgRole, type Team } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

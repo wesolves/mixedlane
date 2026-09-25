@@ -65,7 +65,7 @@ export class UploadsController {
 
   /**
    * <img>/<video> can't send an Authorization header, so files are authorized with the httpOnly
-   * fb_file cookie (set at sign-in, scoped to this path). Only members of the file's org get it.
+   * ml_file cookie (set at sign-in, scoped to this path). Only members of the file's org get it.
    */
   @Public()
   @Get(":name")

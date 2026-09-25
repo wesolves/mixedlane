@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { Search, X } from "lucide-react";
-import { PRIORITIES, PRIORITY_LABELS, TYPE_PLURALS, boardTypes, type ItemType, type WorkItemSummary } from "@flowboard/shared";
+import { PRIORITIES, PRIORITY_LABELS, TYPE_PLURALS, boardTypes, type ItemType, type WorkItemSummary } from "@mixedlane/shared";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

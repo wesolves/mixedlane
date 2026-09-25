@@ -16,15 +16,15 @@ import { mountWellKnown } from "./modules/oauth/oauth.controller";
 /** Interactive API docs at /api/docs (JSON at /api/docs-json). */
 function setupSwagger(app: INestApplication) {
   const doc = new DocumentBuilder()
-    .setTitle("Flowboard API")
+    .setTitle("Mixedlane API")
     .setDescription(
       [
-        "REST API for Flowboard.",
+        "REST API for Mixedlane.",
         "",
         "**Auth:** call `POST /api/auth/login`, then click **Authorize** and paste the `accessToken`.",
         "Org-scoped endpoints also need the **X-Org** header (org slug, e.g. `demo`).",
         "",
-        "In development, sign in with `alice@flowboard.dev` / `Flowboard123`.",
+        "In development, sign in with `alice@mixedlane.dev` / `Mixedlane123`.",
       ].join("\n"),
     )
     .setVersion("1.0")

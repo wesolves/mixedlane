@@ -15,7 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { DevPullRequest, DeploySource } from "@flowboard/shared";
+import type { DevPullRequest, DeploySource } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

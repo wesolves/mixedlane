@@ -15,7 +15,7 @@ import {
   type Progress,
   type WorkItemDetail,
   type WorkItemSummary,
-} from "@flowboard/shared";
+} from "@mixedlane/shared";
 import { DB, type Db, type Executor } from "../../core/database/database";
 import { comments, ghEntities, ghLinks, orgMembers, projects, users, workItems } from "../../core/database/schema";
 import { AppError, notFound } from "../../core/http";

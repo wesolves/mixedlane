@@ -114,7 +114,7 @@ export interface GitHubConnectionInfo {
   login: string | null;
   avatarUrl: string | null;
   apiUrl: string;
-  /** Public base URL of this Flowboard server, if reachable from GitHub. */
+  /** Public base URL of this Mixedlane server, if reachable from GitHub. */
   publicUrl: string;
   /** Full webhook URL to register in GitHub (empty if no public URL). */
   webhookUrl: string;

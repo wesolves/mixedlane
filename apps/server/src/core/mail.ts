@@ -16,7 +16,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 export function actionEmail(opts: { to: string; subject: string; intro: string; action: string; url: string; outro?: string }): Mail {
   const html = `<!doctype html><html><body style="font-family:system-ui,sans-serif;background:#f6f7fb;padding:24px">
 <div style="max-width:520px;margin:auto;background:#fff;border-radius:12px;padding:28px;border:1px solid #e5e7eb">
-<p style="font-weight:600;font-size:18px;margin:0 0 16px">Flowboard</p>
+<p style="font-weight:600;font-size:18px;margin:0 0 16px">Mixedlane</p>
 <p style="color:#374151;line-height:1.6">${esc(opts.intro)}</p>
 <p style="margin:24px 0"><a href="${esc(opts.url)}" style="background:#6366f1;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">${esc(opts.action)}</a></p>
 <p style="color:#6b7280;font-size:13px;line-height:1.6">${esc(opts.outro ?? "If you didn't expect this email, you can ignore it.")}<br>Link: ${esc(opts.url)}</p>

@@ -49,14 +49,14 @@ export async function signAccessToken(claims: AccessClaims): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(claims.sub)
     .setIssuedAt()
-    .setIssuer("flowboard")
+    .setIssuer("mixedlane")
     .setExpirationTime(`${config().ACCESS_TOKEN_TTL_SECONDS}s`)
     .sign(jwtKey());
 }
 
 export async function verifyAccessToken(token: string): Promise<AccessClaims | null> {
   try {
-    const { payload } = await jwtVerify(token, jwtKey(), { issuer: "flowboard", algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, jwtKey(), { issuer: "mixedlane", algorithms: ["HS256"] });
     if (payload.typ !== "access" || typeof payload.sub !== "string" || typeof payload.sid !== "string") return null;
     return { sub: payload.sub, sid: payload.sid };
   } catch {
@@ -66,13 +66,13 @@ export async function verifyAccessToken(token: string): Promise<AccessClaims | n
 
 /** Short-lived token in an httpOnly cookie so <img>/<video> can load protected uploads. */
 export async function signFileToken(userId: string): Promise<string> {
-  return new SignJWT({ typ: "file" }).setProtectedHeader({ alg: "HS256" }).setSubject(userId).setIssuedAt().setIssuer("flowboard").setExpirationTime("1d").sign(jwtKey());
+  return new SignJWT({ typ: "file" }).setProtectedHeader({ alg: "HS256" }).setSubject(userId).setIssuedAt().setIssuer("mixedlane").setExpirationTime("1d").sign(jwtKey());
 }
 
 export async function verifyFileToken(token: string | undefined): Promise<string | null> {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, jwtKey(), { issuer: "flowboard", algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, jwtKey(), { issuer: "mixedlane", algorithms: ["HS256"] });
     return payload.typ === "file" && typeof payload.sub === "string" ? payload.sub : null;
   } catch {
     return null;

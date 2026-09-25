@@ -3,7 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { bootApp, listen, signUp, type TestApp, type TestUser } from "./harness";
 
-/** Agents recording plans in Flowboard: create_plan, planning modes, and the work lifecycle. */
+/** Agents recording plans in Mixedlane: create_plan, planning modes, and the work lifecycle. */
 let ctx: TestApp;
 let org: string;
 let owner: TestUser;

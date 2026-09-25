@@ -14,7 +14,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import type { GitAutomation, ItemType, Priority, StatusDef } from "@flowboard/shared";
+import type { GitAutomation, ItemType, Priority, StatusDef } from "@mixedlane/shared";
 
 const id = () => uuid("id").primaryKey().defaultRandom();
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
@@ -131,7 +131,7 @@ export const agents = pgTable("agents", {
   description: text("description").notNull().default(""),
   /** Access to org-wide doc spaces (project spaces follow the agent's project grants). */
   docAccess: text("doc_access").$type<"none" | "read" | "write">().notNull().default("read"),
-  /** When it plans work: create Flowboard items right away, or propose them and wait for the user. */
+  /** When it plans work: create Mixedlane items right away, or propose them and wait for the user. */
   planningMode: text("planning_mode").$type<"auto" | "propose">().notNull().default("auto"),
   /** May create new projects (it then gets full agent access to them). */
   canCreateProjects: boolean("can_create_projects").notNull().default(true),
