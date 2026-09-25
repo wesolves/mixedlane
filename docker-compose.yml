@@ -5,7 +5,7 @@
 #   db   (Postgres)  data; migrations run automatically when the api starts
 #   minio (optional) S3-compatible uploads — enable with `--profile s3`
 #
-#   cp .env.example .env            # set POSTGRES_PASSWORD, JWT_SECRET, SECRET_KEY, APP_URL
+#   cp .env.example .env            # set POSTGRES_PASSWORD and APP_URL (secrets are generated if empty)
 #   docker compose up -d --build
 #   docker compose --profile s3 up -d --build      # with MinIO for uploads
 #

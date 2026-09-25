@@ -34,6 +34,11 @@ const schema = z.object({
   UPLOAD_DIR: z.string().default(join(SERVER_ROOT, "data", "uploads")),
   /** 64 hex chars; encrypts stored secrets (e.g. GitHub tokens). Generated on first run in dev. */
   SECRET_KEY: z.string().regex(/^[0-9a-f]{64}$/i).optional(),
+  /**
+   * Where JWT_SECRET / SECRET_KEY are generated and kept when they aren't set (a persistent
+   * volume, e.g. /data/secrets in Docker). Unset in production = both must be provided.
+   */
+  SECRETS_DIR: z.string().optional(),
   /** Interface to listen on ("0.0.0.0" = every network interface, e.g. for LAN access). */
   HOST: z.string().default("0.0.0.0"),
   /** Extra browser origins allowed to call the API (comma-separated), besides APP_URL. */
@@ -79,8 +84,9 @@ export function config(): Config {
     throw new Error(`Invalid environment:\n${issues}`);
   }
   if (parsed.data.NODE_ENV === "production") {
-    for (const key of ["DATABASE_URL", "JWT_SECRET", "SECRET_KEY"] as const) {
-      if (!parsed.data[key]) throw new Error(`${key} is required in production`);
+    const required = parsed.data.SECRETS_DIR ? (["DATABASE_URL"] as const) : (["DATABASE_URL", "JWT_SECRET", "SECRET_KEY"] as const);
+    for (const key of required) {
+      if (!parsed.data[key]) throw new Error(`${key} is required in production${key === "DATABASE_URL" ? "" : " (or set SECRETS_DIR to generate and keep it there)"}`);
     }
   }
   if (parsed.data.STORAGE_DRIVER === "s3" && !parsed.data.S3_BUCKET) throw new Error("S3_BUCKET is required when STORAGE_DRIVER=s3");

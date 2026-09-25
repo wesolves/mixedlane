@@ -388,7 +388,7 @@ Every change is attributed to the signed-in user (or to GitHub, for automations)
 | `minio` *(optional)* | `quay.io/minio/minio` | S3-compatible uploads (`--profile s3`). |
 
 ```bash
-cp .env.example .env            # set POSTGRES_PASSWORD, JWT_SECRET, SECRET_KEY, APP_URL (the public URL)
+cp .env.example .env            # set POSTGRES_PASSWORD and APP_URL (the public URL)
 docker compose up -d --build    # → http://<host>:${HOST_PORT:-3000}
 # with S3-compatible uploads on a bundled MinIO:
 docker compose --profile s3 up -d --build
@@ -405,7 +405,8 @@ docker compose --profile s3 up -d --build
 
 **Required configuration**
 - `DATABASE_URL`, plus `JWT_SECRET` and `SECRET_KEY` (64 hex characters).
-- The server refuses to start in production without them.
+- The Docker images set `SECRETS_DIR=/data/secrets`: when the two secrets are left empty, they are generated on first start and kept on the `/data` volume (back it up, or set them in `.env`).
+- Outside Docker, the server refuses to start in production without them unless `SECRETS_DIR` is set.
 
 **Uploads**
 - `STORAGE_DRIVER=local`: a volume at `/data`.

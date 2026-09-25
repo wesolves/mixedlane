@@ -10,3 +10,4 @@ build
 .playwright-mcp
 apps/api/data/
 apps/server/data/
+*.env

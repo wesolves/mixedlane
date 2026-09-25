@@ -31,10 +31,13 @@ RUN (npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit
 # ---- api: backend + MCP server ----
 FROM ${NODE_IMAGE} AS api
 RUN apk add --no-cache tini
+# JWT_SECRET / SECRET_KEY are generated into SECRETS_DIR (on the /data volume) on first start
+# when they aren't set in the environment.
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000 \
-    UPLOAD_DIR=/data/uploads
+    UPLOAD_DIR=/data/uploads \
+    SECRETS_DIR=/data/secrets
 WORKDIR /app
 RUN mkdir -p /data/uploads && chown -R node:node /data
 COPY --chown=node:node package.json ./
