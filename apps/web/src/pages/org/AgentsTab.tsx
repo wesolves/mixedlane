@@ -71,7 +71,7 @@ export function AgentsTab() {
   const open = agents?.find((a) => a.id === openId) ?? null;
 
   return (
-    <div className="max-w-4xl space-y-6 px-6 py-6">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-start gap-4 rounded-xl border bg-gradient-to-br from-violet-500/10 via-transparent to-fuchsia-500/10 p-5">
         <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow">
           <Bot className="size-5" />

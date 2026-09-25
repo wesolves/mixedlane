@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -39,29 +39,33 @@ export function OrgSettingsPage() {
   if (!tabs.some((t) => t.id === tab)) return <Navigate to={paths.orgSettings()} replace />;
   return (
     <div className="flex-1 overflow-y-auto">
-      <header className="border-b px-6 pt-5">
-        <h1 className="text-lg font-semibold tracking-tight">{org?.name} settings</h1>
-        <p className="text-sm text-muted-foreground">Members, teams, AI agents and integrations for the whole organization.</p>
-        <nav className="mt-4 flex gap-1">
-          {tabs.map(({ id, label, icon: Icon }) => (
-            <Link
-              key={id}
-              to={paths.orgSettings(id)}
-              className={cn(
-                "-mb-px flex items-center gap-1.5 border-b-2 border-transparent px-3 pb-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground",
-                tab === id && "border-primary font-medium text-foreground",
-              )}
-            >
-              <Icon className="size-4" /> {label}
-            </Link>
-          ))}
-        </nav>
+      <header className="border-b">
+        <div className="mx-auto w-full max-w-5xl px-6 pt-6">
+          <h1 className="text-xl font-semibold tracking-tight">{org?.name} settings</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Members, teams, AI agents and integrations for the whole organization.</p>
+          <nav className="-mx-3 mt-5 flex flex-wrap gap-x-1">
+            {tabs.map(({ id, label, icon: Icon }) => (
+              <Link
+                key={id}
+                to={paths.orgSettings(id)}
+                className={cn(
+                  "-mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 pb-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground",
+                  tab === id && "border-primary font-medium text-foreground",
+                )}
+              >
+                <Icon className="size-4" /> {label}
+              </Link>
+            ))}
+          </nav>
+        </div>
       </header>
-      {tab === "general" && <GeneralTab />}
-      {tab === "members" && <MembersTab />}
-      {tab === "teams" && <TeamsTab />}
-      {tab === "agents" && <AgentsTab />}
-      {tab === "integrations" && <IntegrationsPage embedded />}
+      <main className="mx-auto w-full max-w-5xl px-6 py-8">
+        {tab === "general" && <GeneralTab />}
+        {tab === "members" && <MembersTab />}
+        {tab === "teams" && <TeamsTab />}
+        {tab === "agents" && <AgentsTab />}
+        {tab === "integrations" && <IntegrationsPage embedded />}
+      </main>
     </div>
   );
 }
@@ -109,57 +113,82 @@ function GeneralTab() {
   });
 
   return (
-    <div className="max-w-2xl space-y-8 px-6 py-6">
-      <section className="space-y-4 rounded-xl border bg-card p-5">
-        <div className="grid gap-1.5">
-          <Label htmlFor="org-name">Name</Label>
-          <Input id="org-name" value={name} disabled={!canManage} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="org-slug">URL</Label>
-          <div className="flex items-center rounded-md border bg-muted/40 pl-3 text-sm text-muted-foreground focus-within:ring-2 focus-within:ring-ring/30">
-            {location.host}/
-            <input
-              id="org-slug"
-              value={slug}
-              disabled={!canManage}
-              onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-              className="h-9 flex-1 bg-transparent px-1 text-foreground outline-none"
-            />
+    <div className="divide-y">
+      <SettingsRow title="Organization" description="The name and web address everyone in the organization sees.">
+        <section className="space-y-4 rounded-xl border bg-card p-5">
+          <div className="grid gap-1.5">
+            <Label htmlFor="org-name">Name</Label>
+            <Input id="org-name" value={name} disabled={!canManage} onChange={(e) => setName(e.target.value)} />
           </div>
-          <p className="text-xs text-muted-foreground">Changing the URL breaks links people have bookmarked.</p>
-        </div>
-        {canManage && (
-          <Button disabled={save.isPending || (name === org?.name && slug === org?.slug) || !name.trim()} onClick={() => save.mutate()}>
-            Save changes
-          </Button>
-        )}
-      </section>
-
-      <section className="space-y-3 rounded-xl border border-destructive/30 p-5">
-        <h2 className="font-semibold text-destructive">Danger zone</h2>
-        {org?.role !== "owner" && (
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">Leave this organization. You'll lose access to its projects.</p>
-            <Button variant="outline" onClick={() => confirm(`Leave ${org?.name}?`) && leave.mutate()}>
-              <LogOut className="size-4" /> Leave
-            </Button>
+          <div className="grid gap-1.5">
+            <Label htmlFor="org-slug">URL</Label>
+            <div className="flex items-center rounded-md border bg-muted/40 pl-3 text-sm text-muted-foreground focus-within:ring-2 focus-within:ring-ring/30">
+              {location.host}/
+              <input
+                id="org-slug"
+                value={slug}
+                disabled={!canManage}
+                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                className="h-9 min-w-0 flex-1 bg-transparent px-1 text-foreground outline-none"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">Changing the URL breaks links people have bookmarked.</p>
           </div>
-        )}
-        {can("org.delete") && (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Delete the organization and <strong>everything</strong> in it. Type <code className="rounded bg-muted px-1">{org?.slug}</code> to confirm.
-            </p>
-            <div className="flex gap-2">
-              <Input value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder={org?.slug} className="max-w-60" />
-              <Button variant="destructive" disabled={confirmDelete !== org?.slug || remove.isPending} onClick={() => remove.mutate()}>
-                <Trash2 className="size-4" /> Delete organization
+          {canManage && (
+            <div className="flex justify-end border-t pt-4">
+              <Button disabled={save.isPending || (name === org?.name && slug === org?.slug) || !name.trim()} onClick={() => save.mutate()}>
+                Save changes
               </Button>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      </SettingsRow>
+
+      <SettingsRow title="Danger zone" description="These actions can't be undone." danger>
+        <section className="divide-y rounded-xl border border-destructive/30 bg-card">
+          {org?.role !== "owner" && (
+            <div className="flex flex-wrap items-center justify-between gap-4 p-5">
+              <div>
+                <p className="text-sm font-medium">Leave organization</p>
+                <p className="text-sm text-muted-foreground">You'll lose access to its projects.</p>
+              </div>
+              <Button variant="outline" onClick={() => confirm(`Leave ${org?.name}?`) && leave.mutate()}>
+                <LogOut className="size-4" /> Leave
+              </Button>
+            </div>
+          )}
+          {can("org.delete") && (
+            <div className="space-y-3 p-5">
+              <div>
+                <p className="text-sm font-medium">Delete organization</p>
+                <p className="text-sm text-muted-foreground">
+                  Deletes <strong>everything</strong> in it. Type <code className="rounded bg-muted px-1">{org?.slug}</code> to confirm.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Input value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder={org?.slug} className="max-w-60" />
+                <Button variant="destructive" disabled={confirmDelete !== org?.slug || remove.isPending} onClick={() => remove.mutate()}>
+                  <Trash2 className="size-4" /> Delete organization
+                </Button>
+              </div>
+            </div>
+          )}
+          {org?.role === "owner" && !can("org.delete") && <p className="p-5 text-sm text-muted-foreground">Nothing here for your role.</p>}
+        </section>
+      </SettingsRow>
+    </div>
+  );
+}
+
+/** A settings group: title and help text on the left, its controls on the right (stacked on small screens). */
+function SettingsRow({ title, description, danger, children }: { title: string; description: string; danger?: boolean; children: ReactNode }) {
+  return (
+    <div className="grid gap-4 py-8 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] md:gap-10">
+      <div>
+        <h2 className={cn("font-semibold", danger && "text-destructive")}>{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
@@ -202,7 +231,7 @@ function MembersTab() {
   const isOwner = org?.role === "owner";
 
   return (
-    <div className="max-w-4xl space-y-6 px-6 py-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{members?.length ?? 0} members</p>
         {can("org.invite") && (
@@ -401,7 +430,7 @@ function TeamsTab() {
   const manage = can("team.manage");
 
   return (
-    <div className="max-w-4xl space-y-6 px-6 py-6">
+    <div className="space-y-6">
       <p className="text-sm text-muted-foreground">Teams group people so you can give them access to projects together.</p>
       {manage && (
         <form
