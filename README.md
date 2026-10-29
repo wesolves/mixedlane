@@ -397,21 +397,58 @@ Every change is attributed to the signed-in user (or to GitHub, for automations)
 
 ## Production
 
-`docker-compose.yml` runs the full stack. Only the web container is published; everything is served from one origin.
+`docker-compose.yml` runs the app with external PostgreSQL. Use the standalone `docker-compose.db.yml` instead to include bundled PostgreSQL. Only the web container is published; everything is served from one origin.
 
 | Service | Image target | What it does |
 | --- | --- | --- |
 | `web` | `Dockerfile --target web` (nginx, non-root) | Serves the built UI and reverse-proxies `/api` (REST, uploads), `/api/socket` (WebSocket), `/api/mcp` (MCP, streamed) and `/.well-known` (OAuth discovery). Strict CSP (app scripts and Cloudflare analytics only), security headers, long-cache hashed assets, `index.html` never cached. |
 | `api` | `Dockerfile --target api` (Node, non-root, tini) | REST API, **MCP server**, realtime socket, job worker, agent plugins. Runs migrations on start. Internal only. |
-| `db` | `postgres:17-alpine` | Data (volume `pgdata`). Internal only. |
+| `db` *(bundled stack only)* | `postgres:17-alpine` | Data (volume `pgdata`). Internal only; included in `docker-compose.db.yml`. |
 | `minio` *(optional)* | `quay.io/minio/minio` | S3-compatible uploads (`--profile s3`). |
 
 ```bash
-cp .env.example .env            # set POSTGRES_PASSWORD and APP_URL (the public URL)
+cp .env.example .env            # set DATABASE_URL and APP_URL (the public URL)
 docker compose up -d --build    # → http://<host>:${HOST_PORT:-3000}
 # with S3-compatible uploads on a bundled MinIO:
 docker compose --profile s3 up -d --build
 ```
+
+**External PostgreSQL**
+
+To use your own PostgreSQL server, create a database and user, then set `DATABASE_URL` in `.env`:
+
+```dotenv
+DATABASE_URL='postgresql://mixedlane:encoded-password@db.example.com:5432/mixedlane?sslmode=verify-full'
+```
+
+Use your provider's TLS settings; `sslmode=verify-full` verifies the server certificate and hostname using a trusted CA. Percent-encode special characters in the URL's username and password. The database host must be reachable from the API container; `localhost` inside it refers to the container itself. For a database on the Docker Desktop host, use `host.docker.internal`.
+
+Start the default stack:
+
+```bash
+docker compose config --quiet
+docker compose up -d --build
+# Add --profile s3 before up to also run bundled MinIO.
+```
+
+The default stack contains no bundled `db` service or database startup dependency. `POSTGRES_PASSWORD` is unused and can be empty; an empty `DATABASE_URL` fails Compose validation.
+
+Migrations run automatically against the external database on API startup. The database user needs permissions to create and alter application tables and the `drizzle` migration schema. The external server must be ready before startup; check `docker compose logs api` and `/api/health` after launching. Pointing at a different database does not copy existing data.
+
+**Bundled PostgreSQL**
+
+Set `POSTGRES_PASSWORD` in `.env` to a strong URL-safe value (for example, a generated hex string), then use the standalone bundled stack:
+
+```bash
+docker compose -f docker-compose.db.yml config --quiet
+docker compose -f docker-compose.db.yml up -d --build
+# With bundled MinIO uploads:
+docker compose -f docker-compose.db.yml --profile s3 up -d --build
+```
+
+This starts PostgreSQL 17 and waits for its health check before starting the API. It builds the internal connection URL from `POSTGRES_PASSWORD`, ignoring any external `DATABASE_URL` in `.env`. An empty password fails Compose validation. Data persists in `pgdata`; changing the password in `.env` does not change credentials in an existing database volume. Use `-f docker-compose.db.yml` for subsequent commands such as `logs` and `down`; this file is used on its own, without merging it with `docker-compose.yml`.
+
+If switching an existing installation, stop its stack first using the original Compose file (for example, `docker compose -f docker-compose.db.yml down` for bundled mode), keep its volumes, and migrate your data separately before starting against the new database. Both files use the same Compose project name and are alternatives for one deployment. If upgrading from the previous default that bundled Postgres, stop that stack with its original file before replacing it.
 
 - **HTTPS:** put any TLS proxy (Caddy, Traefik, a cloud load balancer) in front of `web`, set `APP_URL=https://…` (turns on Secure cookies + HSTS) and `TRUST_PROXY=2`. nginx passes the proxy's `X-Forwarded-Proto` through.
 - **Single container instead:** `docker build -t mixedlane .` builds the default `app` target — the api also serving the UI (`WEB_DIST`) — and needs only `DATABASE_URL` plus the secrets.

@@ -1,15 +1,10 @@
-# Mixedlane production stack
+# Mixedlane production stack — external PostgreSQL (default)
 #
-#   web  (nginx)     :8080 → published on HOST_PORT — the UI, and a reverse proxy for everything below
-#   api  (Node)      REST API, MCP server (/api/mcp), realtime socket (/api/socket), jobs, agent plugins
-#   db   (Postgres)  data; migrations run automatically when the api starts
-#   minio (optional) S3-compatible uploads — enable with `--profile s3`
-#
-#   cp .env.example .env            # set POSTGRES_PASSWORD and APP_URL (secrets are generated if empty)
-#   docker compose up -d --build
-#   docker compose --profile s3 up -d --build      # with MinIO for uploads
-#
-# Only `web` is exposed; api and db are reachable only on the internal network.
+# Set DATABASE_URL and APP_URL in .env (see .env.example).
+# docker compose up -d --build
+# docker compose --profile s3 up -d --build    # optional MinIO uploads
+# For bundled PostgreSQL, use docker compose -f docker-compose.db.yml up -d --build.
+# Only web is published; api is internal. Migrations run when api starts.
 
 name: mixedlane
 
@@ -17,33 +12,15 @@ x-restart: &restart
   restart: unless-stopped
 
 services:
-  db:
-    <<: *restart
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: mixedlane
-      POSTGRES_USER: mixedlane
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mixedlane -d mixedlane"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-
   api:
     <<: *restart
     build:
       context: .
       target: api
     image: mixedlane-api:latest
-    depends_on:
-      db:
-        condition: service_healthy
     env_file: .env
     environment:
-      DATABASE_URL: postgres://mixedlane:${POSTGRES_PASSWORD}@db:5432/mixedlane
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env for external PostgreSQL}
       # One proxy hop (the web container). Use 2 if another TLS proxy / load balancer sits in front.
       TRUST_PROXY: ${TRUST_PROXY:-1}
     volumes:
@@ -100,6 +77,5 @@ services:
       BUCKET: ${S3_BUCKET:-mixedlane}
 
 volumes:
-  pgdata:
   uploads:
   minio:

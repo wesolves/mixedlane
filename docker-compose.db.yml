@@ -1,0 +1,99 @@
+# Mixedlane production stack — bundled PostgreSQL
+#
+# Set POSTGRES_PASSWORD and APP_URL in .env (see .env.example).
+# docker compose -f docker-compose.db.yml up -d --build
+# docker compose -f docker-compose.db.yml --profile s3 up -d --build
+# Only web is published; api and db are internal. Migrations run when api starts.
+
+name: mixedlane
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  db:
+    <<: *restart
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: mixedlane
+      POSTGRES_USER: mixedlane
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env for bundled PostgreSQL}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mixedlane -d mixedlane"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    <<: *restart
+    build:
+      context: .
+      target: api
+    image: mixedlane-api:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://mixedlane:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env for bundled PostgreSQL}@db:5432/mixedlane
+      # One proxy hop (the web container). Use 2 if another TLS proxy / load balancer sits in front.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+    volumes:
+      - uploads:/data
+    expose:
+      - "3000"
+
+  web:
+    <<: *restart
+    build:
+      context: .
+      target: web
+    image: mixedlane-web:latest
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_UPSTREAM: api:3000
+    ports:
+      - "${HOST_PORT:-3000}:8080"
+
+  # --- Optional: S3-compatible storage for uploads (enable with --profile s3) ---
+  minio:
+    <<: *restart
+    profiles: ["s3"]
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-mixedlane}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-mixedlane-secret}
+    ports:
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio-init:
+    profiles: ["s3"]
+    # The MinIO server image ships the `mc` client too.
+    image: quay.io/minio/minio:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "mc alias set local http://minio:9000 $${MINIO_USER} $${MINIO_PASSWORD} &&
+                  mc mb --ignore-existing local/$${BUCKET}"
+    environment:
+      MINIO_USER: ${S3_ACCESS_KEY_ID:-mixedlane}
+      MINIO_PASSWORD: ${S3_SECRET_ACCESS_KEY:-mixedlane-secret}
+      BUCKET: ${S3_BUCKET:-mixedlane}
+
+volumes:
+  pgdata:
+  uploads:
+  minio:

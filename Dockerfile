@@ -5,7 +5,8 @@
 #   --target web   nginx: the built web app + reverse proxy to the api (one origin for everything)
 #   --target app   all-in-one: api that also serves the web app (default; simplest single-container deploy)
 #
-# docker-compose.yml runs db + api + web (+ optional MinIO).
+# docker-compose.yml runs api + web with external PostgreSQL (+ optional MinIO).
+# docker-compose.db.yml also runs bundled PostgreSQL.
 
 ARG NODE_IMAGE=node:24-alpine
 
