@@ -57,22 +57,22 @@ export function webDist(): string | null {
 }
 
 /**
- * Serves the SPA: hashed assets are cached forever, everything else that isn't /api falls back to
- * index.html (never cached, so deploys take effect immediately).
+ * Serves the public homepage and the separate noindex application shell.
  */
 export function serveWeb(app: INestApplication, dir: string) {
   const express = app as NestExpressApplication;
   express.useStaticAssets(dir, {
     index: false,
     setHeaders: (res, path) => {
-      res.setHeader("cache-control", path.includes(`${join("assets", "")}`) ? "public, max-age=31536000, immutable" : "public, max-age=3600");
+      res.setHeader("cache-control", path.endsWith(".html") ? "no-cache" : path.includes(`${join("assets", "")}`) ? "public, max-age=31536000, immutable" : "public, max-age=3600");
     },
   });
   const index = readFileSync(join(dir, "index.html"), "utf8");
+  const application = readFileSync(join(dir, "app.html"), "utf8");
   app.use((req: Request, res: Response, next: NextFunction) => {
     if ((req.method !== "GET" && req.method !== "HEAD") || req.path.startsWith("/api/") || req.path === "/api" || req.path.startsWith("/.well-known/")) return next();
     res.setHeader("cache-control", "no-cache");
-    res.type("html").send(index);
+    res.type("html").send(req.path === "/" ? index : application);
   });
   return index;
 }

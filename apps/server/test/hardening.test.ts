@@ -11,6 +11,7 @@ const web = mkdtempSync(join(tmpdir(), "mixedlane-web-"));
 beforeAll(async () => {
   mkdirSync(join(web, "assets"));
   writeFileSync(join(web, "index.html"), `<!doctype html><html><head><script>document.documentElement.dataset.x="1"</script></head><body><div id="root"></div></body></html>`);
+  writeFileSync(join(web, "app.html"), `<!doctype html><html><head><meta name="robots" content="noindex, follow" /></head><body><div id="root"></div></body></html>`);
   writeFileSync(join(web, "assets", "app-abc123.js"), "console.log(1)");
   ctx = await bootApp({ WEB_DIST: web, API_RATE_LIMIT: "30" });
 });
@@ -19,6 +20,18 @@ afterAll(async () => {
 });
 
 describe("single-container web serving", () => {
+  it("separates the public homepage from the noindex app shell, including direct HTML requests", async () => {
+    const home = await ctx.http().get("/");
+    expect(home.status).toBe(200);
+    expect(home.text).not.toContain('content="noindex, follow"');
+    for (const route of ["/login", "/register", "/app", "/app.html", "/demo/projects"]) {
+      const response = await ctx.http().get(route);
+      expect(response.status).toBe(200);
+      expect(response.text).toContain('content="noindex, follow"');
+      expect(response.headers["cache-control"]).toBe("no-cache");
+    }
+    expect((await ctx.http().get("/index.html")).headers["cache-control"]).toBe("no-cache");
+  });
   it("serves the SPA for app routes, with a strict CSP that allows the hashed theme script and Cloudflare beacon", async () => {
     const res = await ctx.http().get("/demo/projects/APP/story/APP-0001");
     expect(res.status).toBe(200);

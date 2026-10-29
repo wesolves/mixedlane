@@ -4,14 +4,69 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <title>Mixedlane</title>
-    <script src="/theme-init.js"></script>
+    <meta name="theme-color" content="#f5f7f2" />
+    <title>Mixedlane — Project Tracking, Docs &amp; AI Agents</title>
+    <meta name="description" content="Plan projects, track issues on Kanban boards, and keep docs connected. Mixedlane brings software teams and AI agents together with MCP and self-hosting." />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="__PUBLIC_SITE_URL__/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Mixedlane" />
+    <meta property="og:title" content="Mixedlane — Bring your team, docs, and AI agents into one lane" />
+    <meta property="og:description" content="Project tracking for software teams. Connect the plan, the context, and the work with Kanban boards, linked docs, GitHub, and MCP." />
+    <meta property="og:url" content="__PUBLIC_SITE_URL__/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Mixedlane — Project Tracking, Docs &amp; AI Agents" />
+    <meta name="twitter:description" content="One workspace for software teams and AI agents. Plan projects, track issues, and keep your docs connected." />
+    <link rel="stylesheet" href="/src/landing.css" />
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header wrap">
+      <a class="brand" href="/" aria-label="Mixedlane home"><span class="brand-mark" aria-hidden="true"><i></i><i></i></span>mixedlane<span class="brand-period">.</span></a>
+      <nav class="desktop-nav" aria-label="Main navigation"><a href="#product">Product</a><a href="#agents">AI &amp; MCP</a><a href="#self-host">Self-hosting</a><a href="#faq">FAQ</a></nav>
+      <div class="nav-actions"><a class="login" href="/login">Sign in</a><a class="button small" href="/register">Get started <span aria-hidden="true">↗</span></a></div>
+    </header>
+    <main id="main" itemscope itemtype="https://schema.org/SoftwareApplication">
+      <meta itemprop="name" content="Mixedlane" /><meta itemprop="applicationCategory" content="BusinessApplication" /><meta itemprop="operatingSystem" content="Web" /><link itemprop="url" href="__PUBLIC_SITE_URL__/" />
+      <section class="hero wrap">
+        <div class="hero-copy"><p class="eyebrow"><span class="status-dot"></span> FOR TEAMS THAT BUILD TOGETHER</p>
+          <h1>Project tracking.<br />Shared context.<br /><span>Forward motion.</span></h1>
+          <p class="hero-description" itemprop="description">Your plans, issues, docs, and AI agents belong together. Mixedlane gives software teams one clear place to turn the next idea into work that ships.</p>
+          <div class="cta-row"><a class="button" href="/register">Create your workspace <span aria-hidden="true">↗</span></a><a class="text-link" href="#product">Take a closer look <span aria-hidden="true">↓</span></a></div>
+          <p class="hero-note">Kanban boards. Connected docs. MCP built in.</p>
+        </div>
+        <div class="hero-art" aria-label="Illustrative project board showing planning, documentation, and AI agent work">
+          <div class="orbit-label"><span aria-hidden="true">✳</span> A little less scattered. A lot more connected.</div>
+          <div class="product-window">
+            <div class="window-top"><span class="mini-logo">m.</span><span>Acme workspace <span class="muted">/</span> Product launch</span><span class="window-dots" aria-hidden="true">•••</span></div>
+            <div class="window-body"><aside class="mock-sidebar" aria-hidden="true"><b>WORKSPACE</b><span>◫ &nbsp; Overview</span><span class="selected">▥ &nbsp; Projects</span><span>▤ &nbsp; Documents</span><span>✳ &nbsp; AI agents</span><div class="sidebar-bottom">◉ &nbsp; Team settings</div></aside>
+            <div class="mock-content"><div class="project-heading"><div><small>PROJECT / LAUNCH</small><h2>Make the next thing happen.</h2></div><span class="avatar-stack" aria-hidden="true">JL</span></div><div class="board-tabs"><b>▥ &nbsp; Board</b><span>☷ &nbsp; List</span><span>◫ &nbsp; Overview</span></div>
+            <div class="board"><div class="column"><div class="column-title"><span>○ &nbsp; To do</span><small>2</small></div><article class="task-card"><small>LAUNCH-12</small><h3>Map the first-run experience</h3><span class="tag purple">User story</span><div class="card-bottom"><span>☷ 3 subtasks</span><span class="avatar">JL</span></div></article><article class="task-card"><small>LAUNCH-15</small><h3>Write the getting started guide</h3><span class="tag">Documentation</span><div class="card-bottom"><span>▤ Linked doc</span><span class="avatar amber">MK</span></div></article></div>
+            <div class="column"><div class="column-title"><span><em>◐</em> &nbsp; In progress</span><small>2</small></div><article class="task-card active-card"><small>LAUNCH-09</small><h3>Build a better onboarding flow</h3><span class="tag green">Task</span><div class="card-bottom"><span>↗ PR linked</span><span class="avatar">SA</span></div></article><article class="task-card"><small>LAUNCH-14</small><h3>Review release checklist</h3><span class="tag purple">AI assisted</span><div class="card-bottom"><span>✳ Agent activity</span><span class="avatar dark">AI</span></div></article></div>
+            <div class="column"><div class="column-title"><span class="done">● &nbsp; Done</span><small>1</small></div><article class="task-card"><small>LAUNCH-06</small><h3>Agree on the launch scope</h3><span class="tag green">Milestone</span><div class="card-bottom"><span>✓ Complete</span><span class="avatar amber">MK</span></div></article></div></div>
+            <div class="window-footer"><span class="status-dot"></span> Everyone working from the same plan <span>Live updates ↗</span></div></div></div>
+          </div><div class="agent-note"><span class="agent-icon" aria-hidden="true">✳</span><div><b>Context, meet action.</b><p>Your AI agents can work here, too.</p></div><span aria-hidden="true">↗</span></div>
+          <p class="illustration-note">Illustrative workspace · sample tasks</p>
+        </div>
+      </section>
+      <div class="capability-strip"><div class="wrap"><span>ONE CONNECTED WORKSPACE</span><b>Projects <i>+</i> Docs <i>+</i> GitHub <i>+</i> AI agents</b><span>Less context switching. More doing. ↗</span></div></div>
+      <section class="section wrap" id="product"><div class="section-heading"><p class="eyebrow">01 / KEEP THE WHOLE PICTURE</p><h2>Big ideas. Small tasks.<br />A clear line between them.</h2><p>Project management for software teams should connect the why to the work. Go from an epic to the next task without losing the thread.</p></div>
+        <div class="feature-grid"><article class="feature feature-board"><span class="feature-number">01 / PLAN &amp; TRACK</span><h3>A plan with room to move.</h3><p>Organize epics, milestones, user stories, tasks, and subtasks. Switch between a Kanban board and a tree list, with statuses that fit your workflow.</p><div class="hierarchy" aria-label="Work item hierarchy"><span>⚡ Epic <b>Launch a better experience</b></span><span>↳ &nbsp; Milestone <b>First release</b></span><span>↳ &nbsp; User story <b>Get started with confidence</b></span><span>↳ &nbsp; Task <b>Build the welcome flow</b></span></div></article>
+        <article class="feature feature-docs"><span class="feature-number">02 / WRITE &amp; CONNECT</span><h3>Keep the reasoning close.</h3><p>Write specs, decisions, and release notes in shared docs. Link pages to work items so your team can find the context behind a task.</p><div class="doc-preview"><small>PRODUCT / GETTING STARTED</small><h4>The first five minutes</h4><p>A good start makes the next step obvious.</p><div class="doc-rule"></div><div class="doc-rule short"></div><span class="tag green">↗ Linked to LAUNCH-12</span></div></article></div>
+      </section>
+      <section class="agent-section" id="agents"><div class="wrap agent-layout"><div><p class="eyebrow">02 / MAKE AI PART OF THE WORKFLOW</p><h2>Your team has context.<br />Your agents should, too.</h2><p>Connect compatible AI assistants through Mixedlane’s Model Context Protocol (MCP) server. Let agents find work, create structured plans, add comments, and update progress within the permissions you grant.</p><a class="button light" href="/register">Bring your workflow together <span aria-hidden="true">↗</span></a></div><div class="agent-flow"><div class="flow-prompt"><span>YOU</span><p>“Turn the launch plan into stories and tasks.”</p></div><div class="flow-line" aria-hidden="true">↓</div><div class="flow-result"><span class="agent-icon" aria-hidden="true">✳</span><div><b>A shared plan. Ready for the team.</b><p>Epic → Milestone → Story → Task</p><div class="agent-pills"><span>Scoped access</span><span>Activity history</span><span>Shared docs</span></div></div></div><p class="example-note">Example workflow · requires a connected MCP client</p></div></div></section>
+      <section class="section wrap connections"><div class="section-heading"><p class="eyebrow">03 / STAY IN THE LOOP</p><h2>From the board<br />to the pull request.</h2></div><div class="connection-copy"><p>Connect GitHub repositories and reference work item keys in branches, commits, and pull requests. Keep development activity tied to the work it delivers.</p><div class="mini-features"><article><h3>Built for working together</h3><p>Live updates, presence, comments, and an inbox help the team stay close to what changes.</p></article><article><h3>Access with intention</h3><p>Organization roles, project access, and agent permissions let you choose who can see and change work.</p></article></div></div></section>
+      <section class="self-host wrap" id="self-host"><div class="host-symbol" aria-hidden="true">[ m. ]</div><div><p class="eyebrow">YOUR WORKSPACE. YOUR INFRASTRUCTURE.</p><h2>Prefer to host it yourself?</h2><p>Mixedlane supports Docker deployment with PostgreSQL. Explore the source, review the setup, and run project tracking and docs on infrastructure you manage.</p></div><a class="button outline" href="https://github.com/wesolves/mixedlane#production">Explore self-hosting <span aria-hidden="true">↗</span></a></section>
+      <section class="section wrap faq" id="faq"><div class="section-heading"><p class="eyebrow">A FEW THINGS YOU MIGHT BE WONDERING</p><h2>Good questions.<br />Clear answers.</h2></div><div class="faq-list">
+        <details><summary>What is Mixedlane?</summary><p>Mixedlane is a project and issue tracker for software teams, with Kanban boards, a hierarchical work list, shared docs, GitHub automation, and AI agent access through MCP.</p></details>
+        <details><summary>Can I use Mixedlane as a Jira alternative?</summary><p>If your team needs issue tracking, configurable workflows, linked docs, and AI agent access, Mixedlane is worth evaluating. Check your own requirements before switching; migration tooling and feature parity with Jira are not promised.</p></details>
+        <details><summary>How do AI agents connect to Mixedlane?</summary><p>Compatible clients connect to the MCP server. An administrator configures the agent’s project access and permissions, and the agent can then use the tools it is allowed to access. See the <a href="https://github.com/wesolves/mixedlane#ai-agents--mcp">MCP setup guide</a> for configuration details.</p></details>
+        <details><summary>Can I self-host Mixedlane?</summary><p>Yes. The repository includes Docker deployment options and PostgreSQL support. Your team manages hosting, backups, email delivery, and updates. Review the <a href="https://github.com/wesolves/mixedlane#production">deployment guide</a> before setting up a public instance.</p></details>
+        <details><summary>Are project docs public?</summary><p>The marketing homepage is public. Workspace projects, docs, and uploads remain subject to organization membership and access permissions. Creating a landing page does not make your workspace content public.</p></details>
+        <details><summary>How do I get started?</summary><p><a href="/register">Create an account and workspace</a>, start a project, choose your work item types and statuses, and invite your team. Already have a workspace? <a href="/login">Sign in here</a>.</p></details>
+      </div></section>
+      <section class="closing wrap"><p class="eyebrow">LESS SCATTERED. MORE TOGETHER.</p><h2>Give your next idea<br />a place to move forward.</h2><a class="button" href="/register">Create your workspace <span aria-hidden="true">↗</span></a><p>Start with a project. Keep the context. Build together.</p></section>
+    </main>
+    <footer class="footer wrap"><a class="brand" href="/">mixedlane<span class="brand-period">.</span></a><p>One lane for the work ahead.</p><nav aria-label="Footer navigation"><a href="https://github.com/wesolves/mixedlane">Source &amp; documentation ↗</a><a href="/login">Sign in</a><a href="#main">Back to top ↑</a></nav></footer>
   </body>
 </html>

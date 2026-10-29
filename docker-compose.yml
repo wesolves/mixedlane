@@ -56,6 +56,8 @@ services:
     build:
       context: .
       target: web
+      args:
+        VITE_PUBLIC_SITE_URL: ${VITE_PUBLIC_SITE_URL:-https://mixedlane.wesolves.in}
     image: mixedlane-web:latest
     depends_on:
       api:

@@ -61,6 +61,8 @@ const router = createBrowserRouter([
     element: <Root />,
     children: [
       { index: true, element: <RootRedirect /> },
+      { path: "app", element: <RootRedirect /> },
+      { path: "app.html", element: <RootRedirect /> },
       { path: "login", element: <LoginPage /> },
       { path: "register", element: <RegisterPage /> },
       { path: "forgot-password", element: <ForgotPasswordPage /> },

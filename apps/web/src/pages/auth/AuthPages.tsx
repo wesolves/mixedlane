@@ -16,12 +16,12 @@ function AuthShell({ title, subtitle, children, footer }: { title: string; subti
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2">
+        <a href="/" aria-label="Mixedlane home" className="mb-6 flex items-center justify-center gap-2">
           <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
             <FolderKanban className="size-5" />
           </div>
           <span className="text-lg font-semibold tracking-tight">Mixedlane</span>
-        </div>
+        </a>
         <div className="rounded-2xl border bg-card p-6 shadow-sm">
           <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}

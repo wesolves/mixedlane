@@ -98,6 +98,8 @@ All app pages live under your organization, e.g. `/demo/...`.
 | URL | Page |
 | --- | --- |
 | `/login`, `/register`, `/forgot-password`, `/invite/:token` | Auth pages |
+| `/` | Public marketing homepage (static HTML; no session required) |
+| `/app` | Open the last workspace, or sign in |
 | `/demo/projects` | All projects |
 | `/demo/projects/new` | Create a project |
 | `/demo/projects/APP` | Overview (`/board`, `/list` and `/settings` tabs) |
@@ -396,6 +398,8 @@ Every change is attributed to the signed-in user (or to GitHub, for automations)
 - Client → server: `presence:join` (`{ resource: "item:<id>" | "page:<id>", mode }`) and `presence:leave`.
 
 ## Production
+
+**Public homepage and SEO:** `/` serves a static landing page; application routes use the separate `app.html` shell with `noindex, follow`. Both nginx and the all-in-one server support this split. Set `VITE_PUBLIC_SITE_URL` to the public origin **before building** so canonical/social URLs, `robots.txt`, and `sitemap.xml` point at the right site. Docker Compose forwards this build argument from `.env`; for a standalone image use `docker build --build-arg VITE_PUBLIC_SITE_URL=https://your-domain.example -t mixedlane .`. Private projects, docs, and uploads still require existing access checks. See [SEO research and launch plan](SEO-RESEARCH.md) for keyword research, content priorities, and Search Console launch steps.
 
 `docker-compose.yml` runs the full stack. Only the web container is published; everything is served from one origin.
 

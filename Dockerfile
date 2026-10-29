@@ -20,6 +20,8 @@ COPY tsconfig*.json ./
 COPY scripts ./scripts
 COPY packages ./packages
 COPY apps ./apps
+ARG VITE_PUBLIC_SITE_URL=https://mixedlane.wesolves.in
+ENV VITE_PUBLIC_SITE_URL=${VITE_PUBLIC_SITE_URL}
 RUN npm run build
 
 # ---- Production dependencies only ----

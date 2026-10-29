@@ -1,11 +1,38 @@
 import path from "node:path";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv, type Plugin, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-export default defineConfig({
+// Public marketing HTML stays independent of the authenticated React application.
+// Rewrite clean application URLs in dev/preview just as production servers do.
+function publicPages(siteUrl: string): Plugin {
+  const rewrite = (server: Pick<ViteDevServer, "middlewares">) => {
+    server.middlewares.use((req, _res, next) => {
+      const pathname = (req.url || "/").split("?")[0];
+      if ((req.method === "GET" || req.method === "HEAD") && req.headers.accept?.includes("text/html") && pathname !== "/" && pathname !== "/index.html" && !pathname.includes(".") && !pathname.startsWith("/api") && !pathname.startsWith("/@")) req.url = "/app.html";
+      next();
+    });
+  };
+  return {
+    name: "mixedlane-public-pages",
+    configureServer: rewrite,
+    configurePreviewServer: rewrite,
+    transformIndexHtml: (html) => html.replaceAll("__PUBLIC_SITE_URL__", siteUrl),
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "sitemap.xml", source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${siteUrl}/</loc></url></urlset>\n` });
+      this.emitFile({ type: "asset", fileName: "robots.txt", source: `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${siteUrl}/sitemap.xml\n` });
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "VITE_");
+  const publicUrl = new URL(env.VITE_PUBLIC_SITE_URL || "https://mixedlane.wesolves.in");
+  if (!['http:', 'https:'].includes(publicUrl.protocol) || publicUrl.username || publicUrl.password || publicUrl.pathname !== '/' || publicUrl.search || publicUrl.hash) throw new Error("VITE_PUBLIC_SITE_URL must be an HTTP(S) origin without a path, credentials, query, or fragment");
+  return {
   root: __dirname,
-  plugins: [react(), tailwindcss()],
+  plugins: [publicPages(publicUrl.origin), react(), tailwindcss()],
+  build: { rollupOptions: { input: { home: path.resolve(__dirname, "index.html"), app: path.resolve(__dirname, "app.html") } } },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -25,4 +52,5 @@ export default defineConfig({
       "/.well-known": { target: `http://localhost:${process.env.API_PORT || 3001}` },
     },
   },
+  };
 });
