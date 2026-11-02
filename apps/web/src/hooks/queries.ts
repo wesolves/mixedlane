@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { GitAutomation, ItemCreate, ItemMove, ItemUpdate, ProjectCreate, ProjectUpdate, WorkItemSummary } from "@mixedlane/shared";
+import type { Comment, GitAutomation, ItemCreate, ItemMove, ItemUpdate, ProjectCreate, ProjectUpdate, WorkItemDetail, WorkItemSummary } from "@mixedlane/shared";
 import { api } from "@/lib/api";
 
 export const qk = {
@@ -74,20 +74,26 @@ export function useDeleteProject() {
   });
 }
 
-export function useCreateItem() {
+export function useCreateItem(draftId?: string) {
   const invalidate = useInvalidateWork();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: ItemCreate) => api.items.create(input),
-    onSuccess: invalidate,
+    mutationFn: (input: ItemCreate) => draftId ? api.whatsapp.createTicket(draftId, input) : api.items.create(input),
+    onSuccess: async () => { await invalidate(); if (draftId) await qc.invalidateQueries({ queryKey: ["whatsapp"] }); },
     onError,
   });
 }
 
 export function useUpdateItem() {
   const invalidate = useInvalidateWork();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: ItemUpdate }) => api.items.update(id, patch),
-    onSuccess: invalidate,
+    onSuccess: (saved) => {
+      // Show the server-confirmed values immediately; follow-up reads run in the background.
+      qc.setQueryData<WorkItemDetail>(qk.item(saved.key), (current) => current ? { ...current, ...saved } : current);
+      void invalidate();
+    },
     onError,
   });
 }
@@ -140,7 +146,10 @@ export function useUpdateComment(itemId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: string }) => api.comments.update(id, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.comments(itemId) }),
+    onSuccess: (saved) => {
+      qc.setQueryData<Comment[]>(qk.comments(itemId), (current) => current?.map((c) => c.id === saved.id ? saved : c));
+      void qc.invalidateQueries({ queryKey: qk.comments(itemId) });
+    },
     onError,
   });
 }

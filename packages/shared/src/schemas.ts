@@ -83,6 +83,11 @@ export const itemUpdateSchema = z
   })
   .partial();
 
+export const itemTransferSchema = z.object({
+  projectId: z.string().uuid(),
+  parentId: z.string().uuid().nullable().default(null),
+});
+
 export const itemMoveSchema = z.object({
   status: z.string().max(40),
   sortOrder: z.number(),

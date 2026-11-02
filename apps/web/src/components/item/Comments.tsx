@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Loader2, MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { Comment } from "@mixedlane/shared";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -17,15 +17,22 @@ export function Comments({ itemId }: { itemId: string }) {
   const add = useAddComment(itemId);
   const [draft, setDraft] = useState("");
   const [composerKey, setComposerKey] = useState(0);
+  const submitting = useRef(false);
   const reset = () => {
+    if (submitting.current) return;
     setDraft("");
     setComposerKey((k) => k + 1);
   };
 
   const submit = async () => {
-    if (isEmptyHtml(draft)) return;
-    await add.mutateAsync(draft);
-    reset();
+    if (isEmptyHtml(draft) || submitting.current) return;
+    submitting.current = true;
+    try {
+      await add.mutateAsync(draft);
+      setDraft("");
+      setComposerKey((k) => k + 1);
+    } catch { /* The mutation displays the error; keep the draft for retry. */ }
+    finally { submitting.current = false; }
   };
 
   return (
@@ -34,11 +41,11 @@ export function Comments({ itemId }: { itemId: string }) {
       <div className="flex gap-3">
         <UserAvatar name={user?.name ?? "You"} className="mt-1 size-7" />
         <div className="min-w-0 flex-1 space-y-2">
-          <RichEditor key={composerKey} value="" onChange={setDraft} placeholder="Add a comment… (Ctrl+Enter to send)" onSubmit={submit} compact />
+          <RichEditor key={composerKey} value="" onChange={setDraft} placeholder="Add a comment… (Ctrl+Enter to send)" onSubmit={submit} disabled={add.isPending} compact />
           {!isEmptyHtml(draft) && (
             <div className="flex gap-2">
-              <Button size="sm" onClick={submit} disabled={add.isPending}>Comment</Button>
-              <Button size="sm" variant="ghost" onClick={reset}>Discard</Button>
+              <Button size="sm" onClick={submit} disabled={add.isPending}>{add.isPending && <Loader2 className="size-4 animate-spin" />}{add.isPending ? "Sending…" : "Comment"}</Button>
+              <Button size="sm" variant="ghost" disabled={add.isPending} onClick={reset}>Discard</Button>
             </div>
           )}
         </div>
@@ -82,16 +89,22 @@ function CommentRow({ comment, itemId }: { comment: Comment; itemId: string }) {
   const remove = useDeleteComment(itemId);
   const edited = comment.updatedAt !== comment.createdAt;
   const editRef = useRef<HTMLDivElement>(null);
+  const saving = useRef(false);
 
   useEffect(() => {
     if (editing) editRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [editing]);
 
   const save = async () => {
-    if (isEmptyHtml(draft)) return;
-    await update.mutateAsync({ id: comment.id, body: draft });
-    setEditing(false);
+    if (isEmptyHtml(draft) || saving.current) return;
+    saving.current = true;
+    try {
+      await update.mutateAsync({ id: comment.id, body: draft });
+      setEditing(false);
+    } catch { /* The mutation displays the error; keep the draft for retry. */ }
+    finally { saving.current = false; }
   };
+  const cancel = () => { if (!saving.current) setEditing(false); };
 
   return (
     <li id={`comment-${comment.id}`} className="group flex scroll-mt-6 gap-3 rounded-lg target:bg-primary/5 target:ring-8 target:ring-primary/5">
@@ -123,10 +136,10 @@ function CommentRow({ comment, itemId }: { comment: Comment; itemId: string }) {
         </div>
         {editing ? (
           <div ref={editRef} className="mt-2 scroll-mt-4 space-y-2">
-            <RichEditor value={draft} onChange={setDraft} autofocus onSubmit={save} onCancel={() => setEditing(false)} fill="screen" fillOffset="5.5rem" />
+            <RichEditor value={draft} onChange={setDraft} autofocus onSubmit={save} onCancel={cancel} disabled={update.isPending} fill="screen" fillOffset="5.5rem" />
             <div className="flex gap-2">
-              <Button size="sm" onClick={save}>Save</Button>
-              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+              <Button size="sm" disabled={update.isPending} onClick={save}>{update.isPending && <Loader2 className="size-4 animate-spin" />}{update.isPending ? "Saving…" : "Save"}</Button>
+              <Button size="sm" disabled={update.isPending} variant="ghost" onClick={cancel}>Cancel</Button>
             </div>
           </div>
         ) : (

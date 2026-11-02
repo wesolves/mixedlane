@@ -101,6 +101,7 @@ export const api = {
     contact: (phone: string, userId: string) => request("/whatsapp/contacts", json("PUT", { phone, userId })),
     removeContact: (id: string) => request(`/whatsapp/contacts/${id}`, { method: "DELETE" }),
     drafts: () => request<import("@mixedlane/shared").WhatsappDraft[]>("/whatsapp/drafts"),
+    createTicket: (id: string, input: ItemCreate) => request<WorkItemSummary>(`/whatsapp/drafts/${id}/create-ticket`, json("POST", input)),
     review: (id: string, action: "approve" | "cancel" | "retry") => request(`/whatsapp/drafts/${id}/review`, json("POST", { action })),
   },
   auth: {
@@ -162,6 +163,8 @@ export const api = {
     tree: (idOrKey: string) => request<WorkItemSummary[]>(`/projects/${idOrKey}/tree`),
   },
   items: {
+    transferAccess: () => request<{ allowed: boolean }>("/items/transfer-access"),
+    transfer: (id: string, input: { projectId: string; parentId: string | null }) => request<WorkItemSummary>(`/items/${id}/transfer`, json("POST", input)),
     get: (id: string) => request<WorkItemDetail>(`/items/${id}`),
     byKey: (key: string) => request<WorkItemDetail>(`/items/by-key/${key}`),
     create: (input: ItemCreate) => request<WorkItem>("/items", json("POST", input)),

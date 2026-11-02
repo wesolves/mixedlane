@@ -38,6 +38,10 @@ import { useDeleteItem, useItem, useProject, useUpdateItem } from "@/hooks/queri
 import { cn } from "@/lib/utils";
 import { ProjectScope, paths } from "@/lib/project";
 import { copyText } from "@/lib/clipboard";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useOrg } from "@/lib/auth";
+import { TransferItemDialog } from "./TransferItemDialog";
 
 interface Props {
   projectKey: string;
@@ -64,7 +68,7 @@ export function ItemDetail({ projectKey, itemKey, variant, onOpenItem, onDeleted
 
   return (
     <ProjectScope project={project}>
-    <div className={cn("w-full", isPage ? "px-6 py-6" : "px-6 py-5")}>
+    <div className={cn("w-full px-4 sm:px-6", isPage ? "py-6" : "py-5")}>
       <Header item={item} project={project} variant={variant} onOpenItem={onOpenItem} onDeleted={onDeleted} />
 
       <Title key={`${item.id}:${canEdit}`} value={item.title} onSave={(title) => save({ title })} large={isPage} readOnly={!canEdit} />
@@ -156,6 +160,10 @@ function Header({
   const navigate = useNavigate();
   const remove = useDeleteItem();
   const [confirm, setConfirm] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const { org } = useOrg();
+  const isOrgAdmin = org?.role === "owner" || org?.role === "admin";
+  const transferAccess = useQuery({ queryKey: ["transfer-access", org?.id], queryFn: api.items.transferAccess, enabled: isOrgAdmin });
   const viewers = usePresence(`item:${item.id}`);
   const url = `${location.origin}${paths.item(projectKey, item)}`;
 
@@ -188,6 +196,9 @@ function Header({
           <TypeIcon type={item.type} className="size-3.5" />
           <span className="font-mono">{item.key}</span>
         </span>
+        <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label="Copy ticket link" title="Copy ticket link" onClick={() => {
+          void copyText(url).then((ok) => ok ? toast.success("Link copied") : toast.error("Couldn't copy the link"));
+        }}><Link2 className="size-4" /></Button>
       </nav>
 
       <PresenceAvatars users={viewers} />
@@ -205,6 +216,7 @@ function Header({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {isOrgAdmin && transferAccess.data?.allowed && <DropdownMenuItem onSelect={() => setTransferring(true)}>Move to another project</DropdownMenuItem>}
           <DropdownMenuItem
             onSelect={() => {
               void copyText(url).then((ok) => (ok ? toast.success("Link copied") : toast.error("Couldn't copy the link")));
@@ -222,6 +234,8 @@ function Header({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {transferring && <TransferItemDialog item={item} onClose={() => setTransferring(false)} onTransferred={variant === "sheet" ? onDeleted : undefined} />}
 
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>

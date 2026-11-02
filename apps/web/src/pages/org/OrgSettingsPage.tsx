@@ -22,6 +22,7 @@ import { paths, type OrgSettingsTab } from "@/lib/project";
 import { setCurrentOrg } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { copyText } from "@/lib/clipboard";
+import { InstallApp } from "@/components/layout/InstallApp";
 
 const TABS: { id: OrgSettingsTab; label: string; icon: typeof Users }[] = [
   { id: "general", label: "General", icon: Building2 },
@@ -40,10 +41,10 @@ export function OrgSettingsPage() {
   if (!tabs.some((t) => t.id === tab)) return <Navigate to={paths.orgSettings()} replace />;
   return (
     <div className="flex-1 overflow-y-auto">
-      <header className="border-b px-6 pt-5">
+      <header className="border-b px-4 pt-5 sm:px-6">
         <h1 className="text-lg font-semibold tracking-tight">{org?.name} settings</h1>
         <p className="text-sm text-muted-foreground">Members, teams, AI agents and integrations for the whole organization.</p>
-        <nav className="mt-4 flex flex-wrap gap-x-1">
+        <nav aria-label="Organization settings" className="mt-4 flex gap-x-1 overflow-x-auto scroll-thin">
           {tabs.map(({ id, label, icon: Icon }) => (
             <Link
               key={id}
@@ -58,7 +59,7 @@ export function OrgSettingsPage() {
           ))}
         </nav>
       </header>
-      <main className="px-6 py-6">
+      <main className="px-4 py-6 sm:px-6">
         {tab === "general" && <GeneralTab />}
         {tab === "members" && <MembersTab />}
         {tab === "teams" && <TeamsTab />}
@@ -113,6 +114,7 @@ function GeneralTab() {
 
   return (
     <div className="w-full divide-y">
+      <SettingsRow title="App installation" description="Add Mixedlane to this device’s home screen."><InstallApp /></SettingsRow>
       <SettingsRow title="Organization" description="The name and web address everyone in the organization sees.">
         <section className="space-y-4 rounded-xl border bg-card p-5">
           <div className="grid gap-1.5">

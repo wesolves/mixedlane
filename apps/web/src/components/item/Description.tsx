@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Pencil } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RichEditor, RichText, isEmptyHtml } from "@/components/editor/RichEditor";
 
 export function Description({ value, onSave, readOnly }: { value: string; onSave: (html: string) => Promise<unknown> | void; readOnly?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
   const editRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,31 +21,45 @@ export function Description({ value, onSave, readOnly }: { value: string; onSave
   }, [editing]);
 
   const start = () => {
+    setError(null);
     setDraft(value);
     setEditing(true);
   };
   const save = async () => {
-    if (readOnly) return;
-    await onSave(draft);
-    setEditing(false);
+    if (readOnly || inFlight.current) return;
+    inFlight.current = true;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(draft);
+      setEditing(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save the description. Try again.");
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
   };
+  const cancel = () => { if (!inFlight.current) setEditing(false); };
 
   if (editing && !readOnly) {
     return (
-      <div ref={editRef} className="scroll-mt-4 space-y-2">
+      <div ref={editRef} aria-busy={saving} className="scroll-mt-4 space-y-2">
         <RichEditor
           value={draft}
           onChange={setDraft}
           autofocus
           onSubmit={save}
-          onCancel={() => setEditing(false)}
+          onCancel={cancel}
+          disabled={saving}
           placeholder="Describe the goal, context and acceptance criteria…"
           fill="screen"
           fillOffset="5.5rem"
         />
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={save}>Save</Button>
-          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" disabled={saving} onClick={save}>{saving && <Loader2 className="size-4 animate-spin" />}{saving ? "Saving…" : "Save"}</Button>
+          <Button size="sm" variant="ghost" disabled={saving} onClick={cancel}>Cancel</Button>
           <span className="ml-auto text-xs text-muted-foreground">Ctrl+Enter to save · Esc to cancel</span>
         </div>
       </div>

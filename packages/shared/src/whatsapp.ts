@@ -30,9 +30,10 @@ export interface WhatsappSettingsInfo {
   defaultProjectId: string | null; askProjectEveryTime: boolean;
   providers: Record<typeof AI_PROVIDERS[number], { model: string; configured: boolean; url?: string }>;
 }
-export interface WhatsappSession { id: string; name: string; status: string; phone?: string | null; lastError?: string | null; }
+export interface WhatsappSession { id: string; name: string; status: string; phone?: string | null; lastError?: string | null; defaultProjectId?: string | null; }
 export interface WhatsappContact { id: string; phone: string; userId: string; }
 export interface WhatsappDraft {
+  item?: { key: string; type: TicketDraft["type"]; projectKey: string };
   id: string; sessionId: string; chatId: string; userId: string; projectId: string | null;
   report: string; proposal: TicketDraft | null; provider: string | null;
   status: string; itemId: string | null; error: string | null; createdAt: string;

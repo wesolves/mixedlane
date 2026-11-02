@@ -24,6 +24,7 @@ export function WhatsappIntegration() {
   const contacts = useQuery({ queryKey: [...key, "contacts"], queryFn: api.whatsapp.contacts, enabled: manage });
   const members = useQuery({ queryKey: [...key, "members"], queryFn: api.orgs.members, enabled: manage });
   const drafts = useQuery({ queryKey: [...key, "drafts"], queryFn: api.whatsapp.drafts, refetchInterval: 8000 });
+  const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects.list, enabled: manage });
   const [accountName, setAccountName] = useState("");
   const [phone, setPhone] = useState("");
   const [userId, setUserId] = useState("");
@@ -42,7 +43,8 @@ export function WhatsappIntegration() {
         <div className="space-y-3 border-t pt-5"><h3 className="text-sm font-semibold">Connected accounts</h3><p className="text-xs text-muted-foreground">Owners and admins scan the QR here. Each connected number receives direct-message reports.</p>
           {available.data?.map((a) => <div key={a.id} className="flex items-center justify-between rounded-lg bg-muted/40 p-3 text-sm"><span>{a.name} · {a.phone || a.status}</span><Button size="sm" variant="outline" disabled={action.isPending} onClick={() => action.mutate(() => api.whatsapp.linkSession(a.id))}>Link existing account</Button></div>)}
           {accounts.error && <p role="alert" className="text-sm text-destructive">{accounts.error.message}</p>}
-          {accounts.data?.map((a) => <div key={a.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-3"><div className="min-w-0 flex-1"><p className="text-sm font-medium">{a.name}</p><p className="text-xs text-muted-foreground">{a.phone || "Awaiting connection"} · {a.status}</p>{a.lastError && <p className="text-xs text-destructive">{a.lastError}</p>}</div>
+          <p className="text-xs text-muted-foreground">From a linked owner/admin number, send <code>/scope</code> and select a project from the WhatsApp list to make it this account’s default. Send <code>/scope clear</code> to use organization settings.</p>
+          {accounts.data?.map((a) => <div key={a.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-3"><div className="min-w-0 flex-1"><p className="text-sm font-medium">{a.name}</p><p className="text-xs text-muted-foreground">{a.phone || "Awaiting connection"} · {a.status}</p><p className="text-xs text-muted-foreground">Project scope: {a.defaultProjectId ? projects.data?.find((p) => p.id === a.defaultProjectId)?.key ?? "Selected project" : "Organization settings"}</p>{a.lastError && <p className="text-xs text-destructive">{a.lastError}</p>}</div>
             {a.status !== "ready" && <><Button size="sm" variant="outline" disabled={action.isPending} onClick={() => action.mutate(() => api.whatsapp.start(a.id))}><RefreshCw /> Start</Button><Button size="sm" variant="outline" onClick={() => setQrSession(a.id)}><QrCode /> Scan QR</Button></>}
             <Button size="icon" variant="ghost" aria-label={`Remove ${a.name}`} onClick={() => setRemoveId(a.id)}><Trash2 className="size-4" /></Button>
           </div>)}
@@ -58,7 +60,7 @@ export function WhatsappIntegration() {
         {drafts.error && <p role="alert" className="text-sm text-destructive">{drafts.error.message}</p>}
         {!drafts.isLoading && !drafts.data?.length && <p className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">No WhatsApp reports yet.</p>}
         {drafts.isLoading && <p className="text-sm text-muted-foreground">Loading ticket drafts...</p>}
-        {!!drafts.data?.length && <ul className="divide-y rounded-lg border">{drafts.data.slice(0, 5).map((d) => <li key={d.id} className="px-4 py-3 text-sm">{d.proposal?.title ?? d.report.slice(0, 140)}</li>)}</ul>}
+        {!!drafts.data?.length && <ul className="divide-y rounded-lg border">{drafts.data.slice(0, 5).map((d) => <li key={d.id} className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm"><span className="min-w-0 flex-1 break-words">{d.proposal?.title ?? d.report.slice(0, 140)}</span><span className="text-xs text-muted-foreground">{d.status.replaceAll("_", " ")}</span><Button asChild variant="outline" size="sm"><Link to={`/${org?.slug}/ticket-drafts?draft=${d.id}`}>Open draft</Link></Button></li>)}</ul>}
         <Button asChild variant="outline" size="sm"><Link to={`/${org?.slug}/ticket-drafts`}>View all ticket drafts</Link></Button>
       </div>
     </div>

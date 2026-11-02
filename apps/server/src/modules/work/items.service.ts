@@ -121,7 +121,6 @@ export class ItemsService {
     const who = await this.resolveAssignee(orgId, input, transaction ?? this.db);
 
     const insert = async (tx: Executor) => {
-      await this.assertParent(orgId, project, input.type, input.parentId, tx);
       // Atomic counter bump — safe under concurrent creates.
       const [{ counter }] = await tx
         .update(projects)
@@ -131,6 +130,8 @@ export class ItemsService {
       if (counter >= 10 ** project.keyDigits) {
         throw new AppError(409, `Project ${project.key} has used all ${project.keyDigits}-digit item numbers`);
       }
+      // Validate after taking the project counter lock: a concurrent transfer may have moved the parent.
+      await this.assertParent(orgId, project, input.type, input.parentId, tx);
       const [{ max }] = await tx
         .select({ max: sql<number>`coalesce(max(${workItems.sortOrder}), 0)` })
         .from(workItems)
@@ -172,6 +173,9 @@ export class ItemsService {
     patch = { ...patch, ...(await this.resolveAssignee(orgId, patch)) };
 
     const updated = await this.db.transaction(async (tx) => {
+      await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, project.id)).for("update");
+      const fresh = await this.get(orgId, id, tx);
+      if (fresh.projectId !== current.projectId) throw new AppError(409, "This ticket moved to another project. Reload before editing it.");
       if (patch.parentId !== undefined && patch.parentId !== current.parentId) {
         if (patch.parentId === id) throw new AppError(400, "An item cannot be its own parent");
         if (patch.parentId && (await this.isDescendant(tx, patch.parentId, id))) {
@@ -212,6 +216,9 @@ export class ItemsService {
     const current = await this.get(orgId, id);
     this.assertStatus(await this.projects.get(orgId, current.projectId), move.status);
     const moved = await this.db.transaction(async (tx) => {
+      await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, current.projectId)).for("update");
+      const fresh = await this.get(orgId, id, tx);
+      if (fresh.projectId !== current.projectId) throw new AppError(409, "This ticket moved to another project. Reload before changing its status.");
       const [row] = await tx
         .update(workItems)
         .set({ status: move.status, sortOrder: move.sortOrder, updatedAt: new Date() })
@@ -231,6 +238,47 @@ export class ItemsService {
     // parent_id has ON DELETE CASCADE, so descendants go too.
     await this.db.delete(workItems).where(eq(workItems.id, id));
     this.events.emit("item", { orgId, action: "deleted", item, actor });
+  }
+
+  async transfer(orgId: string, id: string, input: { projectId: string; parentId: string | null }, actor: Actor) {
+    const changes = await this.db.transaction(async (tx) => {
+      // Lock projects consistently so transfers cannot race destination counters/configuration.
+      const allProjects = await tx.select().from(projects).where(eq(projects.orgId, orgId)).orderBy(asc(projects.id)).for("update");
+      const target = allProjects.find((p) => p.id === input.projectId);
+      if (!target) throw notFound("Project");
+      const allItems = await tx.select().from(workItems).where(eq(workItems.orgId, orgId)).orderBy(asc(workItems.id)).for("update");
+      const root = allItems.find((i) => i.id === id);
+      if (!root) throw notFound("Work item");
+      if (root.projectId === target.id) throw new AppError(400, "Choose a different project");
+      const source = allProjects.find((p) => p.id === root.projectId)!;
+      const moving = [root];
+      const ids = new Set([root.id]);
+      for (let n = 0; n < moving.length; n++) {
+        for (const child of allItems.filter((i) => i.parentId === moving[n].id && !ids.has(i.id))) { ids.add(child.id); moving.push(child); }
+      }
+      await this.assertParent(orgId, target, root.type, input.parentId, tx);
+      for (const item of moving) {
+        const parent = item.id === id ? null : moving.find((i) => i.id === item.parentId);
+        if (!target.itemTypes.includes(item.type) || (parent && !canHaveParent(item.type, parent.type, target.itemTypes))) throw new AppError(400, `The destination project does not support the ${item.type} hierarchy`);
+      }
+      if (target.itemCounter + moving.length >= 10 ** target.keyDigits) throw new AppError(409, "The destination project has no available ticket numbers");
+      const result: { prev: ItemRow; item: ItemRow }[] = [];
+      for (const [n, prev] of moving.entries()) {
+        const oldStatus = source.statuses.find((s) => s.id === prev.status);
+        const status = target.statuses.find((s) => s.id === prev.status && s.category === oldStatus?.category) ?? target.statuses.find((s) => s.category === oldStatus?.category);
+        if (!status) throw new AppError(400, `The destination workflow has no status for ${oldStatus?.category ?? prev.status}`);
+        const [item] = await tx.update(workItems).set({ projectId: target.id, key: formatItemKey(target.key, target.itemCounter + n + 1, target.keyDigits), parentId: prev.id === id ? input.parentId : prev.parentId, status: status.id, updatedAt: new Date() }).where(eq(workItems.id, prev.id)).returning();
+        await this.activity.log(tx, orgId, item.id, actor, "moved", { field: "project", from: `${source.key} · ${prev.key}`, to: `${target.key} · ${item.key}` });
+        result.push({ prev, item });
+      }
+      await tx.update(projects).set({ itemCounter: target.itemCounter + moving.length }).where(eq(projects.id, target.id));
+      return result;
+    });
+    for (const { prev, item } of changes) {
+      this.events.emit("item", { orgId, action: "deleted", item: prev, actor });
+      this.events.emit("item", { orgId, action: "moved", prev, item, actor });
+    }
+    return changes[0].item;
   }
 
   private async isDescendant(tx: Executor, candidateId: string, ancestorId: string): Promise<boolean> {

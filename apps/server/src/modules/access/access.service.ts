@@ -150,6 +150,13 @@ export class AccessService {
     return (await this.resolveMany(ctx, [project])).get(project.id) ?? null;
   }
 
+  async canTransferItems(ctx: RequestContext): Promise<boolean> {
+    if (ctx.agent || !ctx.userId || !["owner", "admin"].includes(ctx.orgRole)) return false;
+    const all = await this.db.select().from(projects).where(eq(projects.orgId, ctx.orgId));
+    const access = await this.resolveMany(ctx, all);
+    return all.every((p) => access.get(p.id)?.role === "admin");
+  }
+
   /** Loads a project by id or key and asserts a permission. */
   async project(ctx: RequestContext, idOrKey: string, permission: ProjectPermission = "project.read") {
     const match = UUID.test(idOrKey) ? eq(projects.id, idOrKey) : eq(projects.key, idOrKey.toUpperCase());

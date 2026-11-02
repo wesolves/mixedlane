@@ -3,7 +3,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { bootApp, invite, signUp, type TestApp, type TestUser } from "./harness";
 import { DB, type Db } from "../src/core/database/database";
-import { whatsappConnections, whatsappDrafts, whatsappEvents, workItems } from "../src/core/database/schema";
+import { whatsappConnections, whatsappDrafts, whatsappEvents, whatsappSessions, workItems } from "../src/core/database/schema";
 import { WhatsappService } from "../src/modules/whatsapp/whatsapp.service";
 import { decrypt } from "../src/modules/github/crypto";
 import { triage } from "../src/modules/whatsapp/triage";
@@ -68,6 +68,28 @@ describe("WhatsApp integration", () => {
     await owner.api(org).get(`/api/whatsapp/sessions/${sessionId}/qr`).expect(200);
     expect(remoteCalls.some((c) => c.url.endsWith("/webhooks") && c.body?.events?.includes("message.received"))).toBe(true);
   });
+  it("creates a ticket manually from a failed report once and exposes its link", async () => {
+    const [draft] = await db.insert(whatsappDrafts).values({ orgId, sessionId, messageId: randomUUID(), chatId: `${phone}@c.us`, userId: member.id, projectId: project.id, report: "A saved report", status: "failed", error: "AI unavailable" }).returning();
+    const input = { projectId: project.id, type: "task", title: "Manually recovered report", description: "Original report", labels: ["bug"] };
+    const other = await invite(app, owner, org, "wa-manual-other@test.dev", "member");
+    await other.api(org).post(`/api/whatsapp/drafts/${draft.id}/create-ticket`).send(input).expect(403);
+    const item = (await member.api(org).post(`/api/whatsapp/drafts/${draft.id}/create-ticket`).send(input).expect(201)).body;
+    expect(item.labels).toContain("whatsapp");
+    expect(await wa.draft(orgId, draft.id)).toMatchObject({ status: "created", itemId: item.id, error: null });
+    await member.api(org).post(`/api/whatsapp/drafts/${draft.id}/create-ticket`).send(input).expect(409);
+    const visible = (await member.api(org).get("/api/whatsapp/drafts").expect(200)).body.find((d: any) => d.id === draft.id);
+    expect(visible.item).toEqual({ key: item.key, type: "task", projectKey: project.key });
+  });
+
+  it("allows selecting a project for manual recovery but rejects changing an assigned draft's project", async () => {
+    const [draft] = await db.insert(whatsappDrafts).values({ orgId, sessionId, messageId: randomUUID(), chatId: `${phone}@c.us`, userId: member.id, report: "No project yet", status: "select_project" }).returning();
+    await member.api(org).post(`/api/whatsapp/drafts/${draft.id}/create-ticket`).send({ projectId: project.id, type: "task", title: "Recovered unassigned report" }).expect(201);
+    const other = (await owner.api(org).post("/api/projects").send({ key: "MAN", name: "Manual" }).expect(201)).body;
+    const [failed] = await db.insert(whatsappDrafts).values({ orgId, sessionId, messageId: randomUUID(), chatId: `${phone}@c.us`, userId: member.id, projectId: project.id, report: "Already assigned", status: "failed" }).returning();
+    await owner.api(org).post(`/api/whatsapp/drafts/${failed.id}/create-ticket`).send({ projectId: other.id, type: "task", title: "Wrong project" }).expect(400);
+    await owner.api(org).delete(`/api/projects/${other.id}`).expect(204);
+  });
+
   it("lists all drafts beyond 100 for admins, only own drafts for members, and isolates organizations", async () => {
     const admin = await invite(app, owner, org, "wa-admin@test.dev", "admin");
     const other = await invite(app, owner, org, "wa-other@test.dev", "member");
@@ -272,5 +294,94 @@ describe("WhatsApp integration", () => {
     expect(() => validateProposal({ ...proposal, type: "subtask", parentId: randomUUID() }, base)).toThrow("unknown parent");
     expect(() => validateProposal({ ...proposal, type: "subtask" }, base)).toThrow("invalid hierarchy");
     expect(() => validateProposal({ ...proposal, duplicateId: randomUUID() }, base)).toThrow("unknown duplicate");
+  });
+
+  it("lets an owner inspect and change only the connected account's scope without creating drafts", async () => {
+    const adminPhone = "919000000001";
+    await owner.api(org).put("/api/whatsapp/contacts").send({ phone: adminPhone, userId: owner.id }).expect(200);
+    const secondId = randomUUID();
+    await db.insert(whatsappSessions).values({ id: secondId, orgId, name: "another-account", defaultProjectId: project.id });
+    const send = (body: string) => ingest(message({ from: `${adminPhone}@c.us`, chatId: `${adminPhone}@c.us`, body }));
+    try {
+      expect(await send("/scope")).toBeUndefined();
+      expect(remoteCalls.some((c) => c.url.endsWith("send-list") && c.body.description.includes("Current scope:") && c.body.sections[0].rows.some((r: any) => r.rowId === `scope:${project.id}`))).toBe(true);
+      expect(await send(`scope:${project.id}`)).toBeUndefined();
+      expect((await db.select().from(whatsappSessions).where(eq(whatsappSessions.id, sessionId)))[0].defaultProjectId).toBe(project.id);
+      await send("/scope");
+      const currentScope = remoteCalls.filter((c) => c.url.endsWith("send-list")).at(-1)!;
+      expect(currentScope.body.title).toBe("Default project: APP");
+      expect(currentScope.body.sections[0].rows.find((r: any) => r.rowId === `scope:${project.id}`).title).toContain("APP (default)");
+      expect((await db.select().from(whatsappSessions).where(eq(whatsappSessions.id, secondId)))[0].defaultProjectId).toBe(project.id);
+      expect((await db.select().from(whatsappConnections).where(eq(whatsappConnections.orgId, orgId)))[0].defaultProjectId).toBeNull();
+      expect(await send("/scope clear")).toBeUndefined();
+      expect((await db.select().from(whatsappSessions).where(eq(whatsappSessions.id, sessionId)))[0].defaultProjectId).toBeNull();
+      expect((await db.select().from(whatsappSessions).where(eq(whatsappSessions.id, secondId)))[0].defaultProjectId).toBe(project.id);
+    } finally {
+      await db.update(whatsappSessions).set({ defaultProjectId: null }).where(eq(whatsappSessions.id, sessionId));
+      await db.delete(whatsappSessions).where(eq(whatsappSessions.id, secondId));
+    }
+  });
+
+  it("rejects scope commands from members and ignores unknown numbers", async () => {
+    expect(await ingest(message({ body: "/scope APP" }))).toBeUndefined();
+    expect(await ingest(message({ body: `scope:${project.id}` }))).toBeUndefined();
+    expect(await ingest(message({ body: "scope-page:1" }))).toBeUndefined();
+    expect(remoteCalls.some((c) => c.body?.text?.includes("Only organization owners and admins"))).toBe(true);
+    expect((await db.select().from(whatsappSessions).where(eq(whatsappSessions.id, sessionId)))[0].defaultProjectId).toBeNull();
+    remoteCalls = [];
+    expect(await ingest(message({ body: "/scope", from: "919000000099@c.us", chatId: "919000000099@c.us" }))).toBeUndefined();
+    expect(remoteCalls).toHaveLength(0);
+  });
+
+  it("validates scope projects without leaking foreign project information or creating reports", async () => {
+    const send = (body: string) => ingest(message({ from: "919000000001@c.us", chatId: "919000000001@c.us", body }));
+    for (const command of ["/scope EXT", "/scope UNKNOWN", "/scope APP extra"]) expect(await send(command)).toBeUndefined();
+    expect((await db.select().from(whatsappSessions).where(eq(whatsappSessions.id, sessionId)))[0].defaultProjectId).toBeNull();
+    expect(remoteCalls.some((c) => c.body?.text?.includes("That project is unavailable"))).toBe(true);
+    expect(remoteCalls.some((c) => c.body?.text?.includes("Foreign"))).toBe(false);
+  });
+
+  it("routes by account scope, permits explicit overrides, and rechecks sender access", async () => {
+    const scoped = (await owner.api(org).post("/api/projects").send({ key: "SCP", name: "Scoped reports" }).expect(201)).body;
+    const send = (body: string) => ingest(message({ from: "919000000001@c.us", chatId: "919000000001@c.us", body }));
+    try {
+      await send("/scope SCP");
+      expect(await ingest()).toMatchObject({ projectId: scoped.id, status: "generating" });
+      expect(await ingest(message({ body: "APP Explicit override" }))).toMatchObject({ projectId: project.id, report: "Explicit override" });
+      await owner.api(org).patch(`/api/projects/${scoped.id}/access`).send({ defaultRole: "viewer" }).expect(200);
+      expect((await ingest()).projectId).not.toBe(scoped.id);
+      await send("/scope clear");
+      expect((await ingest()).status).toBe("select_project");
+    } finally {
+      await db.update(whatsappSessions).set({ defaultProjectId: null }).where(eq(whatsappSessions.id, sessionId));
+      await owner.api(org).delete(`/api/projects/${scoped.id}`).expect(204);
+    }
+  });
+
+  it("pages the scope project list and accepts WhatsApp selected-row replies", async () => {
+    const created: any[] = [];
+    const adminPhone = "919000000002";
+    const admin = await invite(app, owner, org, "wa-scope-admin@test.dev", "admin");
+    await owner.api(org).put("/api/whatsapp/contacts").send({ phone: adminPhone, userId: admin.id }).expect(200);
+    const send = (extra: Record<string, unknown>) => ingest(message({ from: `${adminPhone}@c.us`, chatId: `${adminPhone}@c.us`, ...extra }));
+    try {
+      for (let n = 0; n < 9; n++) created.push((await owner.api(org).post("/api/projects").send({ key: `P0${n}`, name: `Scope page project ${n}` }).expect(201)).body);
+      await send({ body: "/scope" });
+      const first = remoteCalls.filter((c) => c.url.endsWith("send-list")).at(-1)!;
+      expect(first.body.sections[0].rows).toHaveLength(9);
+      expect(first.body.sections[0].rows.at(-1).rowId).toBe("scope-page:1");
+      await send({ body: "More projects", selectedRowId: "scope-page:1" });
+      const second = remoteCalls.filter((c) => c.url.endsWith("send-list")).at(-1)!;
+      const rows = second.body.sections[0].rows;
+      expect(rows.length).toBeLessThanOrEqual(10);
+      expect(rows.some((r: any) => r.rowId === "scope-page:0")).toBe(true);
+      const chosen = rows.find((r: any) => r.rowId.startsWith("scope:"));
+      expect(await send({ body: chosen.title, selectedRowId: chosen.rowId })).toBeUndefined();
+      expect((await db.select().from(whatsappSessions).where(eq(whatsappSessions.id, sessionId)))[0].defaultProjectId).toBe(chosen.rowId.slice(6));
+      expect(remoteCalls.some((c) => c.body?.text?.startsWith("Scope set to"))).toBe(true);
+    } finally {
+      await db.update(whatsappSessions).set({ defaultProjectId: null }).where(eq(whatsappSessions.id, sessionId));
+      for (const p of created) await owner.api(org).delete(`/api/projects/${p.id}`).expect(204);
+    }
   });
 });

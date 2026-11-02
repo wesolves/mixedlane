@@ -76,14 +76,14 @@ export function BoardPage() {
         </div>
 
         {types.length > 1 && (
-        <div className="flex h-8 items-center rounded-md border p-0.5">
+        <div className="flex h-8 max-w-full items-center overflow-x-auto rounded-md border p-0.5 scroll-thin">
           {([ALL, ...types] as const).map((t) => (
             <button
               key={t}
               aria-pressed={type === t}
               onClick={() => setType(t)}
               className={cn(
-                "flex h-full items-center gap-1.5 rounded px-2.5 text-xs font-medium text-muted-foreground transition-colors",
+                "flex h-full shrink-0 items-center gap-1.5 rounded px-2.5 text-xs font-medium text-muted-foreground transition-colors",
                 type === t && "bg-muted text-foreground",
               )}
             >

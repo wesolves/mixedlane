@@ -49,6 +49,7 @@ interface RichEditorProps {
   onSubmit?: () => void;
   onCancel?: () => void;
   compact?: boolean;
+  disabled?: boolean;
   /**
    * "screen": fill the viewport height (minus `fillOffset`) — used while editing.
    * "parent": fill the remaining space of a flex-column parent (e.g. the create dialog).
@@ -66,14 +67,14 @@ interface PendingUpload {
   progress: number;
 }
 
-export function RichEditor({ value, onChange, placeholder, autofocus, className, onSubmit, onCancel, compact, fill, fillOffset = "6rem" }: RichEditorProps) {
+export function RichEditor({ value, onChange, placeholder, autofocus, className, onSubmit, onCancel, compact, disabled = false, fill, fillOffset = "6rem" }: RichEditorProps) {
   const [uploads, setUploads] = useState<PendingUpload[]>([]);
   const [dragging, setDragging] = useState(false);
   const [source, setSource] = useState<string | null>(null); // raw Markdown while in source mode
   const uploadId = useRef(0);
   // Editor callbacks are created once; refs keep them pointing at the latest props/state.
-  const latest = useRef({ onSubmit, onCancel, onChange });
-  latest.current = { onSubmit, onCancel, onChange };
+  const latest = useRef({ onSubmit, onCancel, onChange, disabled });
+  latest.current = { onSubmit, onCancel, onChange, disabled };
   const insertRef = useRef<(files: File[], pos?: number) => void>(() => {});
   // @mention suggestions: the org's members.
   const { data: members } = useMembers();
@@ -84,10 +85,12 @@ export function RichEditor({ value, onChange, placeholder, autofocus, className,
   const editor = useEditor({
     extensions: editorExtensions(placeholder ?? "Write, paste Markdown, or drop images and videos…"),
     content: value,
+    editable: !disabled,
     autofocus: autofocus ? "end" : false,
     editorProps: {
       attributes: { class: cn(proseClass, "tiptap px-3 py-2", fill ? "flex-1" : compact ? "min-h-[72px]" : "min-h-[140px]") },
       handleKeyDown: (_view, event) => {
+        if (latest.current.disabled) return true;
         if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
           latest.current.onSubmit?.();
           return true;
@@ -100,6 +103,7 @@ export function RichEditor({ value, onChange, placeholder, autofocus, className,
       },
       // Screenshots and copied files arrive as clipboard files.
       handlePaste: (_view, event) => {
+        if (latest.current.disabled) return true;
         const files = [...(event.clipboardData?.files ?? [])].filter(isMedia);
         if (!files.length) return false;
         event.preventDefault();
@@ -107,6 +111,7 @@ export function RichEditor({ value, onChange, placeholder, autofocus, className,
         return true;
       },
       handleDrop: (view, event, _slice, moved) => {
+        if (latest.current.disabled) return true;
         const files = [...(event.dataTransfer?.files ?? [])];
         if (moved || !files.length) return false;
         event.preventDefault();
@@ -118,9 +123,11 @@ export function RichEditor({ value, onChange, placeholder, autofocus, className,
     onUpdate: ({ editor }) => latest.current.onChange?.(editor.isEmpty && !/<(img|video)\b/.test(editor.getHTML()) ? "" : editor.getHTML()),
   });
 
+  useEffect(() => { editor?.setEditable(!disabled); }, [editor, disabled]);
+
   const insertFiles = useCallback(
     async (files: File[], pos?: number) => {
-      if (!editor) return;
+      if (!editor || latest.current.disabled) return;
       for (const file of files) {
         const problem = validateFile(file);
         if (problem) {
@@ -173,6 +180,7 @@ export function RichEditor({ value, onChange, placeholder, autofocus, className,
       onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDragging(false)}
       onDrop={(e) => {
         setDragging(false);
+        if (disabled) return;
         // Drops outside the ProseMirror surface (e.g. on the toolbar) still upload.
         if (source === null && e.dataTransfer.files.length && !(e.target as HTMLElement).closest(".ProseMirror")) {
           e.preventDefault();
@@ -180,7 +188,7 @@ export function RichEditor({ value, onChange, placeholder, autofocus, className,
         }
       }}
     >
-      {editor && <Toolbar editor={editor} onFiles={insertFiles} sourceMode={source !== null} onToggleSource={toggleSource} />}
+      {editor && <fieldset disabled={disabled} className="contents"><Toolbar editor={editor} onFiles={insertFiles} sourceMode={source !== null} onToggleSource={toggleSource} /></fieldset>}
 
       {uploads.length > 0 && (
         <div className="shrink-0 space-y-1 border-b bg-muted/30 px-3 py-1.5">
@@ -200,6 +208,7 @@ export function RichEditor({ value, onChange, placeholder, autofocus, className,
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
       {source !== null ? (
         <textarea
+          disabled={disabled}
           autoFocus
           value={source}
           spellCheck={false}

@@ -200,7 +200,7 @@ export function AppLayout() {
   );
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="app-shell flex h-dvh overflow-hidden">
       <div className="hidden shrink-0 md:block">{!mobileOpen && sidebar}</div>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-64 gap-0 p-0">
