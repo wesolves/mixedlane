@@ -108,14 +108,14 @@ function HierarchyListPage() {
           <EmptyState icon={<Search className="size-5" />} title="No matching work items" description="Try another title or item key." action={<Button variant="outline" onClick={() => setQ("")}>Clear filter</Button>} />
         ) : (
           <div className="overflow-x-auto rounded-xl border bg-card scroll-thin">
-          <div className="min-w-[1000px]">
-            <div className="grid grid-cols-[minmax(360px,1fr)_130px_140px_80px_70px_36px] items-center gap-3 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+          <div className="min-w-0 md:min-w-[1000px]">
+            <div className="grid grid-cols-[minmax(0,1fr)_110px] items-center gap-2 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground md:grid-cols-[minmax(360px,1fr)_130px_140px_80px_70px_36px] md:gap-3">
               <span>Title</span>
               <span>Status</span>
-              <span>Progress</span>
-              <span>Due</span>
-              <span>Priority</span>
-              <span />
+              <span className="hidden md:block">Progress</span>
+              <span className="hidden md:block">Due</span>
+              <span className="hidden md:block">Priority</span>
+              <span className="hidden md:block" />
             </div>
             <div className="divide-y">
               {rows.map(({ item, depth }) => {
@@ -127,9 +127,9 @@ function HierarchyListPage() {
                   <div key={item.id}>
                     <div
                       onClick={() => open(item.key)}
-                      className="grid min-h-11 cursor-pointer grid-cols-[minmax(360px,1fr)_130px_140px_80px_70px_36px] items-center gap-3 px-3 text-sm hover:bg-muted/40"
+                      className="grid min-h-11 cursor-pointer grid-cols-[minmax(0,1fr)_110px] items-center gap-2 px-3 py-2 text-sm hover:bg-muted/40 md:grid-cols-[minmax(360px,1fr)_130px_140px_80px_70px_36px] md:gap-3"
                     >
-                      <div className="flex min-w-0 items-center gap-1.5" style={{ paddingLeft: depth * 20 }}>
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5 md:flex-nowrap" style={{ paddingLeft: Math.min(depth, 4) * 12 }}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -146,7 +146,7 @@ function HierarchyListPage() {
                           onClick={(e) => { e.stopPropagation(); open(item.key); }}
                           title={item.title}
                           className={cn(
-                            "min-w-0 truncate rounded text-left focus-visible:ring-2 focus-visible:ring-ring",
+                            "min-w-0 basis-full rounded text-left break-words focus-visible:ring-2 focus-visible:ring-ring md:basis-auto md:truncate",
                             (item.type === "epic" || item.type === "milestone") && "font-medium",
                             done && "text-muted-foreground line-through",
                           )}
@@ -157,12 +157,12 @@ function HierarchyListPage() {
                       <div onClick={(e) => e.stopPropagation()}>
                         <StatusPicker value={item.status} onChange={(status) => update.mutate({ id: item.id, patch: { status } })} />
                       </div>
-                      <div>{item.progress.total > 0 && <ProgressBar progress={item.progress} showLabel />}</div>
-                      <div>{item.dueDate && <DueDate date={item.dueDate} done={done} />}</div>
-                      <div>
+                      <div className="hidden md:block">{item.progress.total > 0 && <ProgressBar progress={item.progress} showLabel />}</div>
+                      <div className="hidden md:block">{item.dueDate && <DueDate date={item.dueDate} done={done} />}</div>
+                      <div className="hidden md:block">
                         <PriorityIcon priority={item.priority} />
                       </div>
-                      <div>{item.assignee && <UserAvatar name={item.assignee} />}</div>
+                      <div className="hidden md:block">{item.assignee && <UserAvatar name={item.assignee} />}</div>
                     </div>
                     {isOpen && !visible && childType && (item.type === "epic" || item.type === "milestone") && (
                       <div style={{ paddingLeft: (depth + 1) * 20 + 22 }} className="border-t border-dashed">

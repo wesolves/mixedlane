@@ -31,6 +31,7 @@ import {
   VerifyEmailPage,
 } from "@/pages/auth/AuthPages";
 import "./index.css";
+import "./lib/install";
 
 const queryClient = new QueryClient({
   defaultOptions: {

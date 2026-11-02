@@ -97,6 +97,16 @@
 }
 
 /* ---------- Rich text (Tiptap) ---------- */
+.app-shell {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+@media (max-width: 767px) {
+  /* Keep iOS from zooming the whole page when a form field receives focus. */
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea, [contenteditable="true"] {
+    font-size: 16px;
+  }
+}
+.rich-text { overflow-wrap: anywhere; }
 .tiptap {
   outline: none;
 }

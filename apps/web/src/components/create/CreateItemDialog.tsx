@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -23,6 +23,9 @@ import { useCreateItem, useProjects, useProjectTree } from "@/hooks/queries";
 import { paths } from "@/lib/project";
 
 export interface CreateItemOptions {
+  draftId?: string;
+  title?: string;
+  description?: string;
   projectKey?: string;
   parentId?: string | null;
   type?: ItemType;
@@ -66,8 +69,8 @@ function CreateItemDialog({ initial, onClose }: { initial: CreateItemOptions; on
 
   const [type, setType] = useState<ItemType>(initial.type ?? "task");
   const [parentId, setParentId] = useState<string>(initial.parentId ?? NO_PARENT);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState(initial.title ?? "");
+  const [description, setDescription] = useState(initial.description ?? "");
   const [editorKey, setEditorKey] = useState(0);
   const [status, setStatus] = useState(initial.status ?? "");
   const [priority, setPriority] = useState<Priority>("medium");
@@ -75,7 +78,8 @@ function CreateItemDialog({ initial, onClose }: { initial: CreateItemOptions; on
   const { data: members = [] } = useMembers();
   const [dueDate, setDueDate] = useState("");
   const [createMore, setCreateMore] = useState(false);
-  const create = useCreateItem();
+  const create = useCreateItem(initial.draftId);
+  const submitting = useRef(false);
 
   useEffect(() => {
     if (!projectKey && projects.length) setProjectKey(projects[0].key);
@@ -114,29 +118,33 @@ function CreateItemDialog({ initial, onClose }: { initial: CreateItemOptions; on
   const missingParentTypes = allowedParentTypes(type, enabled).map((t) => TYPE_LABELS[t]).join(" or ");
 
   const submit = async () => {
-    if (!project || !title.trim() || needsParent || !enabled.includes(type)) return;
-    const item = await create.mutateAsync({
-      projectId: project.id,
-      parentId: parentId === NO_PARENT ? null : parentId,
-      type,
-      title: title.trim(),
-      description,
-      status: status || undefined,
-      priority,
-      assigneeId,
-      dueDate: dueDate || null,
-    });
-    toast.success(`${item.key} created`, {
-      description: item.title,
-      action: { label: "Open", onClick: () => navigate(paths.item(project.key, item)) },
-    });
-    if (createMore) {
-      setTitle("");
-      setDescription("");
-      setEditorKey((k) => k + 1);
-    } else {
-      onClose();
-    }
+    if (submitting.current || !project || !title.trim() || needsParent || !enabled.includes(type)) return;
+    submitting.current = true;
+    try {
+      const item = await create.mutateAsync({
+        projectId: project.id,
+        parentId: parentId === NO_PARENT ? null : parentId,
+        type,
+        title: title.trim(),
+        description,
+        status: status || undefined,
+        priority,
+        assigneeId,
+        dueDate: dueDate || null,
+      });
+      toast.success(`${item.key} created`, {
+        description: item.title,
+        action: { label: "Open", onClick: () => navigate(paths.item(project.key, item)) },
+      });
+      if (createMore) {
+        setTitle("");
+        setDescription("");
+        setEditorKey((k) => k + 1);
+      } else {
+        onClose();
+      }
+    } catch { /* The mutation displays errors; keep the form available for retry. */ }
+    finally { submitting.current = false; }
   };
 
   return (
@@ -212,7 +220,7 @@ function CreateItemDialog({ initial, onClose }: { initial: CreateItemOptions; on
             className="h-11 text-base font-medium"
           />
 
-          <RichEditor key={editorKey} value="" onChange={setDescription} placeholder="Add a description… (optional) — Markdown, paste or drop images and videos" fill="parent" />
+          <RichEditor key={editorKey} value={description} onChange={setDescription} disabled={create.isPending} placeholder="Add a description… (optional) — Markdown, paste or drop images and videos" fill="parent" />
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm">
             {project && (
@@ -240,7 +248,7 @@ function CreateItemDialog({ initial, onClose }: { initial: CreateItemOptions; on
 
         <DialogFooter className="items-center sm:justify-between">
           <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-            <input type="checkbox" checked={createMore} onChange={(e) => setCreateMore(e.target.checked)} className="accent-primary" />
+            <input type="checkbox" disabled={!!initial.draftId} checked={createMore} onChange={(e) => setCreateMore(e.target.checked)} className="accent-primary" />
             Create another
           </label>
           <div className="flex gap-2">

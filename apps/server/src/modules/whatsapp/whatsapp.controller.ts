@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Headers, HttpCode, Module, Param, Post, 
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import type { Request } from "express";
 import { z } from "zod";
-import { whatsappSettingsSchema, type WhatsappSettingsInput } from "@mixedlane/shared";
+import { itemCreateSchema, whatsappSettingsSchema, type ItemCreate, type WhatsappSettingsInput } from "@mixedlane/shared";
 import { Ctx, Public, type RequestContext } from "../../core/context";
 import { ZodPipe } from "../../core/http";
 import { requireOrg } from "../access/access.service";
@@ -47,6 +47,8 @@ export class WhatsappController {
   drafts(@Ctx() ctx: RequestContext) { return this.wa.listDrafts(ctx); }
   @Post("drafts/:id/review")
   review(@Ctx() ctx: RequestContext, @Param("id", uuid) id: string, @Body(new ZodPipe(reviewSchema)) body: z.infer<typeof reviewSchema>) { return this.wa.review(ctx, id, body.action); }
+  @Post("drafts/:id/create-ticket")
+  createTicket(@Ctx() ctx: RequestContext, @Param("id", uuid) id: string, @Body(new ZodPipe(itemCreateSchema)) body: ItemCreate) { return this.wa.createTicket(ctx, id, body); }
   @Public()
   @Post("webhook/:orgId/:sessionId")
   @HttpCode(202)

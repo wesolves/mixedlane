@@ -5,6 +5,7 @@ import {
   commentUpdateSchema,
   itemCreateSchema,
   itemMoveSchema,
+  itemTransferSchema,
   itemUpdateSchema,
   projectAccessGrantSchema,
   projectAccessSettingsSchema,
@@ -158,6 +159,20 @@ export class ItemsController {
     const id = await this.items.idByKey(ctx.orgId, key);
     await this.access.item(ctx, id, "project.read");
     return this.items.detail(ctx.orgId, id, ctx);
+  }
+
+  @Get("transfer-access")
+  async transferAccess(@Ctx() ctx: RequestContext) {
+    return { allowed: await this.access.canTransferItems(ctx) };
+  }
+
+  @Post(":id/transfer")
+  async transfer(@Ctx() ctx: RequestContext, @Param("id") id: string, @ZBody(itemTransferSchema) body: { projectId: string; parentId: string | null }) {
+    if (!await this.access.canTransferItems(ctx)) throw new AppError(403, "Moving tickets between projects requires an organization owner or admin with admin access to every project");
+    await this.access.item(ctx, id, "item.update");
+    await this.access.project(ctx, body.projectId, "item.create");
+    if (body.parentId) await this.access.item(ctx, body.parentId, "item.update");
+    return toItemDto(await this.items.transfer(ctx.orgId, id, body, ctx.actor));
   }
 
   @Get(":id")

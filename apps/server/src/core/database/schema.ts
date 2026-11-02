@@ -520,6 +520,7 @@ export const whatsappConnections = pgTable("whatsapp_connections", {
 export const whatsappSessions = pgTable("whatsapp_sessions", {
   id: uuid("id").primaryKey(), orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
   name: text("name").notNull(), webhookId: text("webhook_id"), managed: boolean("managed").notNull().default(true),
+  defaultProjectId: uuid("default_project_id").references(() => projects.id, { onDelete: "set null" }),
 });
 export const whatsappContacts = pgTable("whatsapp_contacts", {
   id: id(), orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),

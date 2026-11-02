@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
-import { AI_PROVIDERS, type WhatsappSettingsInput, type WhatsappSettingsInfo } from "@mixedlane/shared";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { AI_PROVIDERS, type ItemCreate, type WhatsappSettingsInput, type WhatsappSettingsInfo } from "@mixedlane/shared";
 import { DB, type Db } from "../../core/database/database";
 import { whatsappConnections as connections, whatsappSessions as sessions, whatsappContacts as contacts, whatsappDrafts as drafts, whatsappEvents as events, projects, workItems } from "../../core/database/schema";
 import type { RequestContext } from "../../core/context";
@@ -81,7 +81,7 @@ export class WhatsappService {
     const local = await this.db.select().from(sessions).where(eq(sessions.orgId, ctx.orgId));
     if (!local.length) return [];
     const client = await this.client(ctx.orgId);
-    return Promise.all(local.map(async (s) => ({ ...(await client.call(`/sessions/${s.id}`)), id: s.id })));
+    return Promise.all(local.map(async (s) => ({ ...(await client.call(`/sessions/${s.id}`)), id: s.id, defaultProjectId: s.defaultProjectId })));
   }
   async createSession(ctx: RequestContext, name: string) {
     requireOrg(ctx, "integration.manage");
@@ -147,12 +147,40 @@ export class WhatsappService {
     const rows = await this.db.select().from(drafts).where(manage ? eq(drafts.orgId, ctx.orgId) : and(eq(drafts.orgId, ctx.orgId), eq(drafts.userId, ctx.userId!))).orderBy(desc(drafts.createdAt), desc(drafts.id));
     const visible: Draft[] = [];
     for (const d of rows) if (!d.projectId || await this.access.canRead(ctx, d.projectId)) visible.push(d);
-    return visible;
+    const itemIds = visible.flatMap((d) => d.itemId ? [d.itemId] : []);
+    if (!itemIds.length) return visible;
+    const linked = await this.db.select({ id: workItems.id, key: workItems.key, type: workItems.type, projectId: workItems.projectId, projectKey: projects.key }).from(workItems)
+      .innerJoin(projects, eq(projects.id, workItems.projectId)).where(and(eq(workItems.orgId, ctx.orgId), inArray(workItems.id, itemIds)));
+    const readable = new Map<string, boolean>();
+    for (const item of linked) if (!readable.has(item.projectId)) readable.set(item.projectId, await this.access.canRead(ctx, item.projectId));
+    const byId = new Map(linked.filter((i) => readable.get(i.projectId)).map((i) => [i.id, i]));
+    return visible.map((d) => {
+      const item = d.itemId ? byId.get(d.itemId) : undefined;
+      return item ? { ...d, item: { key: item.key, type: item.type, projectKey: item.projectKey } } : d;
+    });
   }
   async draft(orgId: string, id: string) {
     const [row] = await this.db.select().from(drafts).where(scope(orgId, id));
     if (!row) throw new AppError(404, "WhatsApp draft not found");
     return row;
+  }
+  async createTicket(ctx: RequestContext, id: string, input: ItemCreate) {
+    const d = await this.draft(ctx.orgId, id);
+    if (ctx.userId !== d.userId && !ctx.orgPermissions.includes("integration.manage")) throw new AppError(403, "Only the sender or an admin can create a ticket from this draft");
+    const { project } = await this.access.project(ctx, input.projectId, "item.create");
+    if (d.projectId && d.projectId !== project.id) throw new AppError(400, "Use the draft's selected project");
+    if (input.parentId) await this.access.item(ctx, input.parentId, "project.read");
+    const item = await this.db.transaction(async (tx) => {
+      const [locked] = await tx.select().from(drafts).where(scope(ctx.orgId, id)).for("update");
+      if (locked.status !== "failed" && locked.status !== "select_project") throw new AppError(409, "Only failed reports or reports awaiting a project can be created manually");
+      if (locked.projectId && locked.projectId !== project.id) throw new AppError(409, "The draft's selected project changed. Reload before creating a ticket.");
+      const created = await this.items.create(ctx.orgId, { ...input, projectId: project.id, labels: [...new Set([...(input.labels ?? []), "whatsapp"])] }, ctx.actor, tx);
+      await tx.update(drafts).set({ projectId: project.id, status: "created", itemId: created.id, error: null }).where(scope(ctx.orgId, id));
+      return created;
+    });
+    this.bus.emit("item", { orgId: ctx.orgId, action: "created", item, actor: ctx.actor });
+    await this.jobs.enqueue("whatsapp.notify", { orgId: ctx.orgId, id }, { uniqueKey: `wa-result:${id}` });
+    return item;
   }
   async review(ctx: RequestContext, id: string, action: "approve" | "cancel" | "retry") {
     const d = await this.draft(ctx.orgId, id);
@@ -236,6 +264,54 @@ export class WhatsappService {
     let text = String(m.button?.id ?? m.metadata?.button?.id ?? m.selectedButtonId ?? m.selectedRowId ?? m.metadata?.selectedButtonId ?? m.metadata?.selectedRowId ?? m.body ?? "").trim().slice(0, 12000);
     if (!text) return;
     const client = await this.client(event.orgId);
+    // Commands run before quoted-report handling so a command never edits or creates a draft.
+    const scopeCommand = /^\/scope(?:\s+([\s\S]*))?$/i.exec(text);
+    const scopeSelection = /^scope:([0-9a-f-]{36})$/i.exec(text);
+    const scopePage = /^scope-page:(\d{1,6})$/i.exec(text);
+    if (scopeCommand || scopeSelection || scopePage) {
+      const reply = (body: string) => client.text(event.sessionId, m.chatId, body, `wa-scope:${event.id}`, m.messageId);
+      if (!ctx.userId || !["owner", "admin"].includes(ctx.orgRole) || !ctx.orgPermissions.includes("integration.manage")) {
+        await reply("Only organization owners and admins can view or change the WhatsApp project scope.");
+        return;
+      }
+      const [session] = await this.db.select().from(sessions).where(and(eq(sessions.orgId, ctx.orgId), eq(sessions.id, event.sessionId)));
+      if (!session) return;
+      const requested = scopeSelection?.[1] ?? scopeCommand?.[1]?.trim();
+      if (!requested) {
+        const available = await this.eligible(ctx);
+        const conn = await this.connection(ctx.orgId);
+        const selected = available.find((p) => p.id === (session.defaultProjectId ?? conn.defaultProjectId));
+        const current = selected ? `${selected.key}: ${selected.name}${session.defaultProjectId ? " (this WhatsApp account)" : " (organization default)"}` : "No default; reports use the organization’s project-selection settings.";
+        const pageSize = 8;
+        const page = Math.min(Number(scopePage?.[1] ?? 0), Math.max(0, Math.ceil(available.length / pageSize) - 1));
+        const rows = available.slice(page * pageSize, (page + 1) * pageSize).map((p) => ({ title: `${p.key}${p.id === selected?.id ? " (default)" : ""}: ${p.name}`.slice(0, 100), rowId: `scope:${p.id}` }));
+        if (page > 0) rows.push({ title: "Previous projects", rowId: `scope-page:${page - 1}` });
+        if ((page + 1) * pageSize < available.length) rows.push({ title: "More projects", rowId: `scope-page:${page + 1}` });
+        if (!rows.length) { await reply("No projects are available for creating tickets."); return; }
+        const description = `Current scope: ${current}\nSelect a project to make it the default for this WhatsApp account. Use /scope clear to return to organization settings.`;
+        const fallback = `${description}\n\nReply with a command below:\n${rows.map((r) => `${r.title}\n${r.rowId}`).join("\n")}`;
+        await client.interactive(event.sessionId, "send-list", { chatId: m.chatId, title: `Default project: ${selected?.key ?? "None"}`, description: description.slice(0, 1000), buttonText: "Projects", sections: [{ title: "Available projects", rows }] }, fallback, `wa-scope-list:${event.id}`, m.messageId);
+        return;
+      }
+      if (/^clear$/i.test(requested)) {
+        await this.db.update(sessions).set({ defaultProjectId: null }).where(and(eq(sessions.orgId, ctx.orgId), eq(sessions.id, session.id)));
+        await reply("This WhatsApp account now uses the organization’s project-selection settings. Existing reports are unchanged.");
+        return;
+      }
+      if (!scopeSelection && !/^[a-z][a-z0-9]{1,4}$/i.test(requested)) {
+        await reply("Use /scope PROJECTCODE, /scope clear, or /scope to list projects.");
+        return;
+      }
+      const selected = await this.access.project(ctx, requested, "item.create").catch(async (error: unknown) => {
+        if (!(error instanceof AppError)) throw error;
+        await reply("That project is unavailable or you cannot create tickets in it. Use /scope to list available projects.");
+        return null;
+      });
+      if (!selected) return;
+      await this.db.update(sessions).set({ defaultProjectId: selected.project.id }).where(and(eq(sessions.orgId, ctx.orgId), eq(sessions.id, session.id)));
+      await reply(`Scope set to ${selected.project.key}: ${selected.project.name} for this WhatsApp account. Future reports use this project when the sender has access. A project code in a report overrides this default. Existing reports are unchanged.`);
+      return;
+    }
     // Quoted replies can approve, cancel, or refine the draft whose preview they answer.
     if (typeof m.quotedMessage?.id === "string") {
       const [quoted] = await this.db.select().from(drafts).where(and(eq(drafts.orgId, ctx.orgId), eq(drafts.sessionId, event.sessionId), eq(drafts.chatId, m.chatId), eq(drafts.userId, ctx.userId!), eq(drafts.previewMessageId, m.quotedMessage.id)));
@@ -276,12 +352,14 @@ export class WhatsappService {
     const explicit = /^\/?([a-z][a-z0-9]{1,4})\s+([\s\S]+)$/i.exec(text);
     const explicitlyChosen = explicit ? available.find((p) => p.key === explicit[1].toUpperCase()) : null;
     const conn = await this.connection(ctx.orgId);
+    const [account] = await this.db.select().from(sessions).where(and(eq(sessions.orgId, ctx.orgId), eq(sessions.id, event.sessionId)));
+    const defaultProjectId = account?.defaultProjectId ?? conn.defaultProjectId;
     let remembered: typeof available[number] | undefined;
-    if (!conn.defaultProjectId && !conn.askProjectEveryTime) {
+    if (!defaultProjectId && !conn.askProjectEveryTime) {
       const [previous] = await this.db.select({ projectId: drafts.projectId }).from(drafts).where(and(eq(drafts.orgId, ctx.orgId), eq(drafts.sessionId, event.sessionId), eq(drafts.chatId, m.chatId), eq(drafts.userId, ctx.userId!), isNotNull(drafts.projectId))).orderBy(desc(drafts.createdAt)).limit(1);
       remembered = available.find((p) => p.id === previous?.projectId);
     }
-    const chosen = explicitlyChosen ?? available.find((p) => p.id === conn.defaultProjectId) ?? remembered ?? (available.length === 1 ? available[0] : null);
+    const chosen = explicitlyChosen ?? available.find((p) => p.id === defaultProjectId) ?? remembered ?? (available.length === 1 ? available[0] : null);
     await this.db.insert(drafts).values({ orgId: ctx.orgId, sessionId: event.sessionId, messageId: m.messageId, chatId: m.chatId, userId: ctx.userId!, projectId: chosen?.id, report: explicitlyChosen && explicit ? explicit[2] : text, status: chosen ? "generating" : "select_project" }).onConflictDoNothing();
     const [draft] = await this.db.select().from(drafts).where(and(eq(drafts.sessionId, event.sessionId), eq(drafts.messageId, m.messageId)));
     if (chosen) { await this.jobs.enqueue("whatsapp.triage", { orgId: ctx.orgId, id: draft.id }, { uniqueKey: `wa-triage:${draft.id}` }); return; }
@@ -328,7 +406,7 @@ export class WhatsappService {
       const sent = await client.interactive(d.sessionId, "send-buttons", { chatId: d.chatId, title: "Review your ticket", description: fallback, buttons: [{ type: "reply", displayText: "Create ticket", id: `approve:${id}` }, { type: "reply", displayText: "Edit report", id: `edit:${id}` }, { type: "reply", displayText: "Cancel", id: `cancel:${id}` }] }, fallback, `wa-preview:${id}:${createHash("sha256").update(JSON.stringify(p)).digest("hex").slice(0, 16)}`, d.messageId);
       if (sent?.messageId) await this.db.update(drafts).set({ previewMessageId: sent.messageId }).where(scope(orgId, id));
     } else if (d.status === "failed" || d.status === "cancelled") {
-      await client.text(d.sessionId, d.chatId, d.status === "cancelled" ? "Report cancelled." : "Your report is saved, but AI could not prepare a ticket. An admin can retry it in Mixedlane → Settings → Integrations → WhatsApp.", `wa-${d.status}:${id}`, d.messageId);
+      await client.text(d.sessionId, d.chatId, d.status === "cancelled" ? "Report cancelled." : `Your report is saved, but AI could not prepare a ticket. Open the draft to retry or create a ticket manually: ${config().PUBLIC_URL ?? config().APP_URL}/${ctx.orgSlug}/ticket-drafts?draft=${id}`, `wa-${d.status}:${id}`, d.messageId);
     }
   }
 }

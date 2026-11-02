@@ -71,7 +71,7 @@ export function AgentsTab() {
   const { data: agents, isLoading } = useQuery({ queryKey: ["agents"], queryFn: api.agents.list, enabled: canManage });
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState<{ agent: string; key: CreatedApiKey } | null>(null);
+  const [revealed, setRevealed] = useState<{ agent: string; key: CreatedApiKey; id?: string } | null>(null);
   const open = agents?.find((a) => a.id === openId) ?? null;
 
   if (!canManage) return <AgentSkillSettings key={org?.id} />;
@@ -126,9 +126,9 @@ export function AgentsTab() {
         </div>
       )}
 
-      <CreateAgentDialog open={creating} onOpenChange={setCreating} existingNames={(agents ?? []).map((a) => a.name)} onCreated={(agent, key) => setRevealed({ agent: agent.name, key })} onOpen={setOpenId} />
+      <CreateAgentDialog open={creating} onOpenChange={setCreating} existingNames={(agents ?? []).map((a) => a.name)} onCreated={(agent, key) => setRevealed({ agent: agent.name, key, id: agent.id })} />
       {open && <AgentSheet agent={open} onClose={() => setOpenId(null)} onKey={(key) => setRevealed({ agent: open.name, key })} />}
-      {revealed && <KeyDialog agentName={revealed.agent} created={revealed.key} onClose={() => setRevealed(null)} />}
+      {revealed && <KeyDialog agentName={revealed.agent} created={revealed.key} onClose={() => setRevealed(null)} onOpenDetails={revealed.id ? () => { setOpenId(revealed.id!); setRevealed(null); } : undefined} />}
     </div>
   );
 }
@@ -137,13 +137,11 @@ function CreateAgentDialog({
   open,
   onOpenChange,
   onCreated,
-  onOpen,
   existingNames,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onCreated: (agent: Agent, key: CreatedApiKey) => void;
-  onOpen: (id: string) => void;
   existingNames: string[];
 }) {
   const [presetId, setPresetId] = useState(AGENT_PRESETS[0].clientId);
@@ -161,7 +159,6 @@ function CreateAgentDialog({
     }
     onOpenChange(false);
     setDescription("");
-    onOpen(agent.id);
     onCreated(agent, key);
   });
   return (
@@ -388,7 +385,7 @@ export function ConnectSnippets({ secret }: { secret?: string }) {
   );
 }
 
-function KeyDialog({ agentName, created, onClose }: { agentName: string; created: CreatedApiKey; onClose: () => void }) {
+function KeyDialog({ agentName, created, onClose, onOpenDetails }: { agentName: string; created: CreatedApiKey; onClose: () => void; onOpenDetails?: () => void }) {
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl">
@@ -407,6 +404,7 @@ function KeyDialog({ agentName, created, onClose }: { agentName: string; created
           <ConnectSnippets secret={created.secret} />
         </div>
         <DialogFooter>
+          {onOpenDetails && <Button variant="outline" onClick={onOpenDetails}>Open agent settings</Button>}
           <Button onClick={onClose}>I've saved the key</Button>
         </DialogFooter>
       </DialogContent>
