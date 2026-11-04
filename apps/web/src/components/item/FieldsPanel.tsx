@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { AssigneePicker, PriorityPicker, StatusPicker } from "@/components/pickers";
 import { TypeIcon } from "@/components/common";
 import { useProjectScope } from "@/lib/project";
+import { HierarchyFields } from "./HierarchyFields";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -87,7 +88,7 @@ function Labels({ labels, onChange }: { labels: string[]; onChange: (l: string[]
   );
 }
 
-export function FieldsPanel({ item, onSave }: { item: WorkItemDetail; onSave: (patch: ItemUpdate) => void }) {
+export function FieldsPanel({ item, onSave }: { item: WorkItemDetail; onSave: (patch: ItemUpdate) => Promise<unknown> | void }) {
   // Without item.update every field below is read-only (a disabled fieldset disables them all).
   const canEdit = useProjectScope().can("item.update");
   return (
@@ -107,6 +108,7 @@ export function FieldsPanel({ item, onSave }: { item: WorkItemDetail; onSave: (p
             <TypeIcon type={item.type} /> {TYPE_LABELS[item.type]}
           </span>
         </Field>
+        <HierarchyFields item={item} onSave={onSave} />
         <Field label="Labels">
           <Labels labels={item.labels} onChange={(labels) => onSave({ labels })} />
         </Field>
