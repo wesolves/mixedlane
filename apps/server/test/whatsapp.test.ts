@@ -20,9 +20,10 @@ function mockRemote(providerMode: "valid" | "fallback" | "all-fail" = "valid") {
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     remoteCalls.push({ url: String(url), body, method: init?.method ?? "GET" });
-    if (String(url).startsWith("https://ollama.com")) return providerMode === "all-fail" ? new Response("", { status: 503 }) : Response.json({ message: { content: providerMode === "fallback" ? '{"type":"unknown"}' : JSON.stringify(proposal) } });
-    if (String(url).startsWith("https://generativelanguage.googleapis.com")) return providerMode === "all-fail" ? new Response("", { status: 429 }) : Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(proposal) }] } }] });
-    if (String(url).startsWith("https://api.x.ai")) return providerMode === "all-fail" ? new Response("", { status: 503 }) : Response.json({ choices: [{ message: { content: JSON.stringify(proposal) } }] });
+    const output = JSON.stringify(body)?.includes("previousTicket") ? { title: proposal.title, description: proposal.description, priority: proposal.priority } : proposal;
+    if (String(url).startsWith("https://ollama.com")) return providerMode === "all-fail" ? new Response("", { status: 503 }) : Response.json({ message: { content: providerMode === "fallback" ? '{"type":"unknown"}' : JSON.stringify(output) } });
+    if (String(url).startsWith("https://generativelanguage.googleapis.com")) return providerMode === "all-fail" ? new Response("", { status: 429 }) : Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }] });
+    if (String(url).startsWith("https://api.x.ai")) return providerMode === "all-fail" ? new Response("", { status: 503 }) : Response.json({ choices: [{ message: { content: JSON.stringify(output) } }] });
     if (String(url).endsWith("/sessions") && init?.method === "POST") return Response.json({ id: sessionId, name: body.name });
     if (String(url).endsWith("/sessions")) return Response.json([]);
     if (String(url).endsWith("/webhooks")) return Response.json({ id: randomUUID() });
@@ -384,4 +385,67 @@ describe("WhatsApp integration", () => {
       for (const p of created) await owner.api(org).delete(`/api/projects/${p.id}`).expect(204);
     }
   });
+  it("updates the requested ticket from text-only context and preserves media and unrelated fields", async () => {
+    const image = '<img src="/api/uploads/11111111-1111-1111-1111-111111111111.png" alt="private screenshot">';
+    const video = '<video src="/api/uploads/22222222-2222-2222-2222-222222222222.mp4" controls></video>';
+    const item = (await member.api(org).post("/api/items").send({ projectId: project.id, type: "task", title: "Original reset issue", description: `<p>Existing requirements</p>${image}${video}`, labels: ["keep-me"], priority: "low" }).expect(201)).body;
+    const body = message({ body: `/UPDATE ${item.key.toLowerCase()} Fix password reset`, quotedMessage: { id: "unrelated-preview" } });
+    expect(await ingest(body)).toBeUndefined();
+    const updated = (await db.select().from(workItems).where(eq(workItems.id, item.id)))[0];
+    expect(updated).toMatchObject({ title: proposal.title, priority: "high", labels: ["keep-me"], type: "task", parentId: null, status: item.status });
+    expect(updated.description).toContain(image);
+    expect(updated.description).toContain(video);
+    const prompt = JSON.parse(remoteCalls.find((c) => c.url.startsWith("https://ollama.com"))!.body.messages[1].content);
+    expect(prompt.previousTicket).toMatchObject({ key: item.key, title: item.title, description: "Existing requirements" });
+    expect(prompt.request).toBe("Fix password reset");
+    expect(JSON.stringify(prompt)).not.toMatch(/private screenshot|\/api\/uploads|<img|<video/);
+    expect(remoteCalls.some((c) => c.body?.text?.startsWith(`Updated ${item.key}:`))).toBe(true);
+    const [event] = await db.select().from(whatsappEvents).where(eq(whatsappEvents.eventKey, (await import("node:crypto")).createHash("sha256").update(body.data.id).digest("hex")));
+    await db.update(whatsappEvents).set({ processed: false }).where(eq(whatsappEvents.id, event.id));
+    remoteCalls = [];
+    await wa.processEvent(event.id);
+    expect(remoteCalls.some((c) => c.url.startsWith("https://ollama.com"))).toBe(false);
+    expect((await db.select().from(workItems).where(eq(workItems.id, item.id)))[0].updatedAt).toEqual(updated.updatedAt);
+    expect(remoteCalls.some((c) => c.body?.text?.startsWith(`Updated ${item.key}:`))).toBe(true);
+  });
+
+  it("returns update usage or an unavailable response without creating reports or calling AI", async () => {
+    for (const body of ["/update", "/update APP-123", "/update invalid some request", "/update APP-99999 fix it"]) expect(await ingest(message({ body }))).toBeUndefined();
+    expect(remoteCalls.some((c) => c.body?.text?.startsWith("Use /update"))).toBe(true);
+    expect(remoteCalls.some((c) => c.body?.text?.includes("ticket is unavailable"))).toBe(true);
+    expect(remoteCalls.some((c) => c.url.startsWith("https://ollama.com"))).toBe(false);
+  });
+
+  it("checks ticket edit permissions before exposing context to AI", async () => {
+    const item = (await member.api(org).post("/api/items").send({ projectId: project.id, type: "task", title: "Permission test" }).expect(201)).body;
+    await owner.api(org).patch(`/api/projects/${project.key}/access`).send({ defaultRole: "viewer" }).expect(200);
+    try {
+      expect(await ingest(message({ body: `/update ${item.key} change this` }))).toBeUndefined();
+      expect(remoteCalls.some((c) => c.url.startsWith("https://ollama.com"))).toBe(false);
+      expect((await db.select().from(workItems).where(eq(workItems.id, item.id)))[0].title).toBe(item.title);
+    } finally {
+      await owner.api(org).patch(`/api/projects/${project.key}/access`).send({ defaultRole: "editor" }).expect(200);
+    }
+  });
+
+  it("leaves the existing ticket unchanged when all update providers fail", async () => {
+    const item = (await member.api(org).post("/api/items").send({ projectId: project.id, type: "task", title: "Retain original" }).expect(201)).body;
+    mockRemote("all-fail");
+    expect(await ingest(message({ body: `/update ${item.key} fix it` }))).toBeUndefined();
+    expect((await db.select().from(workItems).where(eq(workItems.id, item.id)))[0].title).toBe(item.title);
+    expect(remoteCalls.some((c) => c.body?.text?.includes("ticket is unchanged"))).toBe(true);
+  });
+
+  it("rejects stale AI updates when the ticket changes during generation", async () => {
+    const item = (await member.api(org).post("/api/items").send({ projectId: project.id, type: "task", title: "Conflict test" }).expect(201)).body;
+    const original = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (url: any, init: any) => {
+      if (String(url).startsWith("https://ollama.com")) await member.api(org).patch(`/api/items/${item.id}`).send({ title: "Newer human edit" }).expect(200);
+      return original(url, init);
+    }));
+    expect(await ingest(message({ body: `/update ${item.key} fix it` }))).toBeUndefined();
+    expect((await db.select().from(workItems).where(eq(workItems.id, item.id)))[0].title).toBe("Newer human edit");
+    expect(remoteCalls.some((c) => c.body?.text?.includes("changed while AI"))).toBe(true);
+  });
+
 });

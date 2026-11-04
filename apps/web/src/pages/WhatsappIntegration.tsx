@@ -57,6 +57,7 @@ export function WhatsappIntegration() {
         </div>
       </>}
       <div className="space-y-3 border-t pt-5"><div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Ticket drafts</h3><Button size="sm" variant="ghost" onClick={() => void drafts.refetch()}><RefreshCw className="size-3.5" /> Refresh</Button></div><p className="text-xs text-muted-foreground">The sender or an admin can approve. AI chooses the ticket type and parent. Send a report directly, or prefix it with a project code, e.g. APP Login fails after reset.</p>
+        <p className="text-xs text-muted-foreground">To update an existing ticket directly, send <code>/update APP-123 followed by your request</code>. AI uses the existing ticket text and your request, preserving attached media. You need permission to edit the ticket.</p>
         {drafts.error && <p role="alert" className="text-sm text-destructive">{drafts.error.message}</p>}
         {!drafts.isLoading && !drafts.data?.length && <p className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">No WhatsApp reports yet.</p>}
         {drafts.isLoading && <p className="text-sm text-muted-foreground">Loading ticket drafts...</p>}
