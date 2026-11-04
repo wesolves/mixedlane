@@ -166,15 +166,19 @@ export class ItemsService {
     return created;
   }
 
-  async update(orgId: string, id: string, patch: ItemUpdate, actor: Actor): Promise<ItemRow> {
-    const current = await this.get(orgId, id);
-    const project = await this.projects.get(orgId, current.projectId);
+  async update(orgId: string, id: string, patch: ItemUpdate, actor: Actor, options: { transaction?: Tx; expectedUpdatedAt?: Date } = {}): Promise<ItemRow> {
+    const current = await this.get(orgId, id, options.transaction);
+    const project = options.transaction
+      ? (await options.transaction.select().from(projects).where(and(eq(projects.orgId, orgId), eq(projects.id, current.projectId))))[0]
+      : await this.projects.get(orgId, current.projectId);
+    if (!project) throw notFound("Project");
     if (patch.status !== undefined) this.assertStatus(project, patch.status);
-    patch = { ...patch, ...(await this.resolveAssignee(orgId, patch)) };
+    patch = { ...patch, ...(await this.resolveAssignee(orgId, patch, options.transaction)) };
 
-    const updated = await this.db.transaction(async (tx) => {
+    const apply = async (tx: Tx) => {
       await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, project.id)).for("update");
       const fresh = await this.get(orgId, id, tx);
+      if (options.expectedUpdatedAt && fresh.updatedAt.getTime() !== options.expectedUpdatedAt.getTime()) throw new AppError(409, "This ticket changed while AI was preparing the update. Send /update again using the latest ticket.");
       if (fresh.projectId !== current.projectId) throw new AppError(409, "This ticket moved to another project. Reload before editing it.");
       if (patch.parentId !== undefined && patch.parentId !== current.parentId) {
         if (patch.parentId === id) throw new AppError(400, "An item cannot be its own parent");
@@ -207,8 +211,9 @@ export class ItemsService {
         .where(eq(workItems.id, id))
         .returning();
       return row;
-    });
-    if (updated !== current) this.events.emit("item", { orgId, action: "updated", item: updated, prev: current, actor });
+    };
+    const updated = options.transaction ? await apply(options.transaction) : await this.db.transaction(apply);
+    if (!options.transaction && updated !== current) this.events.emit("item", { orgId, action: "updated", item: updated, prev: current, actor });
     return updated;
   }
 

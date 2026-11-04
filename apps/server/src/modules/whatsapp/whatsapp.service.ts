@@ -17,6 +17,7 @@ import { OpenWaClient } from "./client";
 import { triage, validateProposal, type ProviderConfig } from "./triage";
 import { TriageFailure } from "./ai-diagnostics";
 import { whatsappBootstrap } from "./bootstrap";
+import { ticketText } from "./ticket-context";
 
 type Draft = typeof drafts.$inferSelect;
 const scope = (orgId: string, id: string) => and(eq(drafts.orgId, orgId), eq(drafts.id, id));
@@ -231,7 +232,7 @@ export class WhatsappService {
     const messageId = data.id ?? data.messageId ?? data.waMessageId;
     if (typeof messageId !== "string" || messageId.length > 500) throw new AppError(400, "Missing message ID");
     const eventKey = createHash("sha256").update(messageId).digest("hex");
-    await this.db.insert(events).values({ orgId, sessionId, eventKey, payload: { ...data, chatId, messageId } }).onConflictDoNothing();
+    await this.db.insert(events).values({ orgId, sessionId, eventKey, payload: { ...data, chatId, messageId, updateReply: null } }).onConflictDoNothing();
     const [event] = await this.db.select().from(events).where(and(eq(events.sessionId, sessionId), eq(events.eventKey, eventKey)));
     if (!event.processed) await this.jobs.enqueue("whatsapp.incoming", { id: event.id }, { uniqueKey: `wa-in:${event.id}` });
     return { ok: true };
@@ -264,6 +265,10 @@ export class WhatsappService {
     let text = String(m.button?.id ?? m.metadata?.button?.id ?? m.selectedButtonId ?? m.selectedRowId ?? m.metadata?.selectedButtonId ?? m.metadata?.selectedRowId ?? m.body ?? "").trim().slice(0, 12000);
     if (!text) return;
     const client = await this.client(event.orgId);
+    if (/^\/update(?:\s|$)/i.test(text)) {
+      await this.updateTicket(event, ctx, text, client);
+      return;
+    }
     // Commands run before quoted-report handling so a command never edits or creates a draft.
     const scopeCommand = /^\/scope(?:\s+([\s\S]*))?$/i.exec(text);
     const scopeSelection = /^scope:([0-9a-f-]{36})$/i.exec(text);
@@ -366,6 +371,46 @@ export class WhatsappService {
     const rows = available.slice(0, 10).map((p) => ({ title: `${p.key}: ${p.name}`.slice(0, 100), rowId: `project:${draft.id}:${p.id}` }));
     const fallback = `Choose a project by replying with one of these commands:\n${rows.map((r) => `${r.title}\n${r.rowId}`).join("\n")}\nYou can also send PROJECTCODE followed by the report.`;
     await client.interactive(event.sessionId, "send-list", { chatId: m.chatId, title: "Choose a project", description: "Where should this report go?", buttonText: "Projects", sections: [{ title: "Your projects", rows }] }, fallback, `wa-project:${draft.id}`, m.messageId);
+  }
+
+  private async updateTicket(event: typeof events.$inferSelect, ctx: RequestContext, text: string, client: OpenWaClient) {
+    const m = event.payload as any;
+    const reply = (body: string) => client.text(event.sessionId, m.chatId, body, `wa-update:${event.id}`, m.messageId);
+    const command = /^\/update\s+([a-z][a-z0-9]{1,4}-\d+)\s+([\s\S]+)$/i.exec(text);
+    if (!command) { await reply("Use /update TICKET-ID <request>, for example: /update MX-123 update my app."); return; }
+    try {
+      const id = await this.items.idByKey(ctx.orgId, command[1]);
+      const { project } = await this.access.item(ctx, id, "item.update");
+      // A committed result survives notification failures and repeated webhook deliveries.
+      const [saved] = await this.db.select().from(events).where(eq(events.id, event.id));
+      if ((saved.payload as any).updateReply) { await reply((saved.payload as any).updateReply); return; }
+      const previous = await this.items.get(ctx.orgId, id);
+      const context = ticketText(previous.description);
+      const conn = await this.connection(ctx.orgId);
+      const { proposal } = await triage({ report: command[2].trim(), project, items: [], updateTicket: {
+        key: previous.key, title: previous.title, description: context.description, priority: previous.priority, type: previous.type, parentId: previous.parentId,
+      } }, JSON.parse(decrypt(conn.providersEnc)), { orgId: ctx.orgId });
+      // Permission may have changed during the provider call.
+      const currentCtx = await this.sender(ctx.orgId, m.chatId);
+      if (!currentCtx || currentCtx.userId !== ctx.userId) throw new AppError(403, "Your WhatsApp number is no longer linked to this member.");
+      await this.access.item(currentCtx, id, "item.update");
+      const actor = { type: "system" as const, id: null, name: `WhatsApp AI · requested by ${ctx.actor.name}` };
+      const result = await this.db.transaction(async (tx) => {
+        const [locked] = await tx.select().from(events).where(eq(events.id, event.id)).for("update");
+        if ((locked.payload as any).updateReply) return { message: (locked.payload as any).updateReply as string, item: null };
+        const description = ticketText(markdownToHtml(proposal.description)).description;
+        const item = await this.items.update(ctx.orgId, id, { title: proposal.title, description: [markdownToHtml(description), ...context.media].filter(Boolean).join("\n"), priority: proposal.priority }, actor, { transaction: tx, expectedUpdatedAt: previous.updatedAt });
+        const message = `Updated ${item.key}: ${item.title}\n${config().APP_URL}/${ctx.orgSlug}/projects/${project.key}/${item.type}/${item.key}`;
+        await tx.update(events).set({ payload: { ...m, updateReply: message } }).where(eq(events.id, event.id));
+        return { message, item };
+      });
+      if (result.item) this.bus.emit("item", { orgId: ctx.orgId, action: "updated", item: result.item, prev: previous, actor });
+      await reply(result.message);
+    } catch (error) {
+      if (error instanceof AppError) await reply(error.status === 404 || error.status === 403 ? "That ticket is unavailable or you do not have permission to update it." : error.message);
+      else if (error instanceof TriageFailure) await reply("AI could not prepare the update. Your ticket is unchanged. Please send /update again.");
+      else throw error;
+    }
   }
 
   async generate(orgId: string, id: string) {
