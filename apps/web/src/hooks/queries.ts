@@ -89,10 +89,11 @@ export function useUpdateItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: ItemUpdate }) => api.items.update(id, patch),
-    onSuccess: (saved) => {
+    onSuccess: async (saved, { patch }) => {
       // Show the server-confirmed values immediately; follow-up reads run in the background.
       qc.setQueryData<WorkItemDetail>(qk.item(saved.key), (current) => current ? { ...current, ...saved } : current);
-      void invalidate();
+      if (patch.parentId !== undefined) await invalidate();
+      else void invalidate();
     },
     onError,
   });

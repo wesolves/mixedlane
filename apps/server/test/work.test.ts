@@ -1,13 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PASSWORD, bootApp, signUp, type TestUser } from "./harness";
+import { PASSWORD, bootApp, invite, signUp, type TestUser } from "./harness";
 
 let ctx: Awaited<ReturnType<typeof bootApp>>;
 let me: TestUser;
 let api: ReturnType<TestUser["api"]>;
+let org: string;
 beforeAll(async () => {
   ctx = await bootApp();
   const s = await signUp(ctx, { name: "Tester" });
   me = s.user;
+  org = s.org;
   api = me.api(s.org);
 });
 afterAll(async () => {
@@ -85,6 +87,43 @@ describe("projects & items", () => {
     expect(c.body.author).toBe("Tester");
     const found = (await api.get("/api/search?q=checkout")).body;
     expect(found.items.map((i: { key: string }) => i.key)).toContain("AB-000001");
+  });
+
+  it("changes a ticket's epic and milestone without moving its former parent or siblings", async () => {
+    const project = (await api.post("/api/projects").send({ key: "HR", name: "Hierarchy", itemTypes: ["epic", "milestone", "story", "task"] }).expect(201)).body;
+    const create = async (type: string, title: string, parentId?: string) => (await api.post("/api/items").send({ projectId: project.id, type, title, parentId }).expect(201)).body;
+    const first = await create("epic", "First epic");
+    const second = await create("epic", "Second epic");
+    const milestone = await create("milestone", "First milestone", first.id);
+    const nextMilestone = await create("milestone", "Second milestone", second.id);
+    const story = await create("story", "Original story", milestone.id);
+    const task = await create("task", "Move this task", story.id);
+    const sibling = await create("task", "Keep this sibling", story.id);
+    const detail = async (id: string) => (await api.get(`/api/items/${id}`).expect(200)).body;
+    expect((await detail(task.id)).ancestors.map((a: { id: string }) => a.id)).toEqual([first.id, milestone.id, story.id]);
+
+    await api.patch(`/api/items/${task.id}`).send({ parentId: nextMilestone.id }).expect(200);
+    expect((await detail(task.id)).ancestors.map((a: { id: string }) => a.id)).toEqual([second.id, nextMilestone.id]);
+    expect((await detail(story.id)).parentId).toBe(milestone.id);
+    expect((await detail(sibling.id)).parentId).toBe(story.id);
+
+    // Clearing a milestone keeps its epic; selecting an epic moves directly under it.
+    await api.patch(`/api/items/${task.id}`).send({ parentId: second.id }).expect(200);
+    expect((await detail(task.id)).ancestors.map((a: { id: string }) => a.id)).toEqual([second.id]);
+    await api.patch(`/api/items/${task.id}`).send({ parentId: null }).expect(200);
+    expect((await detail(task.id)).ancestors).toEqual([]);
+
+    await api.patch(`/api/items/${milestone.id}`).send({ parentId: null }).expect(400);
+    await api.patch(`/api/items/${task.id}`).send({ parentId: task.id }).expect(400);
+    const foreignParent = (await api.get("/api/items/by-key/AB-000001").expect(200)).body;
+    await api.patch(`/api/items/${task.id}`).send({ parentId: foreignParent.id }).expect(400);
+
+    const viewer = await invite(ctx, me, org, "hierarchy-viewer@test.dev", "member");
+    await api.patch(`/api/projects/${project.id}/access`).send({ defaultRole: "viewer" }).expect(200);
+    await viewer.api(org).get(`/api/items/${story.id}`).expect(200).then((res) => {
+      expect(res.body.ancestors.map((a: { id: string }) => a.id)).toEqual([first.id, milestone.id]);
+    });
+    await viewer.api(org).patch(`/api/items/${task.id}`).send({ parentId: first.id }).expect(403);
   });
 
   it.each([
