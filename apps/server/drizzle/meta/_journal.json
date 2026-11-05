@@ -120,6 +120,13 @@
       "when": 1793900000000,
       "tag": "0016_mixdi",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793910000000,
+      "tag": "0017_mixdi_conversations",
+      "breakpoints": true
     }
   ]
 }

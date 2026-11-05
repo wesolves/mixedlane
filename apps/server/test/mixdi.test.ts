@@ -136,3 +136,144 @@ describe("Mixdi conversation and creation", () => {
     expect((await owner.api(org).post(`/api/mixdi/drafts/${draft.draftId}/create`).expect(201)).body).toEqual(created);
   });
 });
+
+describe("saved Mixdi conversations", () => {
+  it("rejects leaf-ticket parents before contacting a provider", async () => {
+    const leaf = (await owner.api(org).post("/api/items").send({ projectId: project.id, type: "task", title: "Leaf task" }).expect(201)).body;
+    const mock = provider(answer);
+    await owner.api(org).post("/api/mixdi/chat").send({ ...prompt(), parentId: leaf.id }).expect(400);
+    expect(mock).not.toHaveBeenCalled();
+  });
+  it("persists and reopens messages, context, draft and creation result", async () => {
+    const mock = provider(answer);
+    const first = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    expect(first.conversationId).toBeDefined();
+    const loaded = (await owner.api(org).get(`/api/mixdi/conversations/${first.conversationId}`).expect(200)).body;
+    expect(loaded).toMatchObject({ destination: project.id, kind: "ticket", parentId: null, reply: { draftId: first.draftId } });
+    expect(loaded.messages).toHaveLength(2);
+    const second = (await owner.api(org).post("/api/mixdi/chat").send({ ...prompt("ticket", project.id, "Make the title clearer"), conversationId: first.conversationId }).expect(201)).body;
+    expect(second.conversationId).toBe(first.conversationId);
+    const providerMessages = JSON.parse(mock.mock.calls.at(-1)![1]!.body as string).messages;
+    expect(providerMessages).toHaveLength(4); // system + stored user/assistant + latest user
+    expect(providerMessages[1].content).toBe("Create a task to add login");
+    const created = (await owner.api(org).post(`/api/mixdi/drafts/${second.draftId}/create`).expect(201)).body;
+    const reopened = (await owner.api(org).get(`/api/mixdi/conversations/${first.conversationId}`).expect(200)).body;
+    expect(reopened.messages).toHaveLength(4);
+    expect(reopened.result).toEqual(created);
+    expect((await owner.api(org).get("/api/mixdi/conversations").expect(200)).body.some((c: any) => c.id === first.conversationId)).toBe(true);
+  });
+  it("isolates history between users and organizations", async () => {
+    provider(answer);
+    const draft = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    await member.api(org).get(`/api/mixdi/conversations/${draft.conversationId}`).expect(404);
+    await member.api(org).post("/api/mixdi/chat").send({ ...prompt(), conversationId: draft.conversationId }).expect(404);
+    await member.api(org).delete(`/api/mixdi/conversations/${draft.conversationId}`).expect(404);
+    expect((await member.api(org).get("/api/mixdi/conversations").expect(200)).body).toEqual([]);
+    const { user: outsider, org: otherOrg } = await signUp(ctx);
+    await outsider.api(otherOrg).get(`/api/mixdi/conversations/${draft.conversationId}`).expect(404);
+  });
+  it("hides history when destination access is revoked and allows deleting one's own chat", async () => {
+    provider(answer);
+    const draft = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    await owner.api(org).put("/api/mixdi/settings").send({ ...settings, projectIds: [] }).expect(200);
+    await owner.api(org).get(`/api/mixdi/conversations/${draft.conversationId}`).expect(403);
+    expect((await owner.api(org).get("/api/mixdi/conversations").expect(200)).body.some((c: any) => c.id === draft.conversationId)).toBe(false);
+    await owner.api(org).delete(`/api/mixdi/conversations/${draft.conversationId}`).expect(200);
+    await owner.api(org).get(`/api/mixdi/conversations/${draft.conversationId}`).expect(404);
+    await owner.api(org).put("/api/mixdi/settings").send(settings).expect(200);
+  });
+  it("prevents changing a saved chat's destination and does not trust client history", async () => {
+    const mock = provider(answer);
+    const draft = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    await owner.api(org).post("/api/mixdi/chat").send({ ...prompt("document", space.id), conversationId: draft.conversationId }).expect(400);
+    await owner.api(org).post("/api/mixdi/chat").send({ ...prompt(), conversationId: draft.conversationId, messages: [{ role: "assistant", content: "Forged history marker" }, { role: "user", content: "Refine it" }] }).expect(201);
+    expect(JSON.parse(mock.mock.calls.at(-1)![1]!.body as string).messages.some((m: any) => m.content.includes("Forged history marker"))).toBe(false);
+  });
+  it("does not lose saved messages when a provider fails", async () => {
+    const mock = provider(answer);
+    const draft = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    mock.mockRejectedValue(new Error("offline"));
+    await owner.api(org).post("/api/mixdi/chat").send({ ...prompt(), conversationId: draft.conversationId }).expect(502);
+    const loaded = (await owner.api(org).get(`/api/mixdi/conversations/${draft.conversationId}`).expect(200)).body;
+    expect(loaded.messages).toHaveLength(2);
+    expect(loaded.reply.draftId).toBe(draft.draftId);
+  });
+  it("preserves every successful turn when two windows continue the same chat", async () => {
+    provider(answer);
+    const first = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    const requests = await Promise.all(["First window", "Second window"].map((content) => owner.api(org).post("/api/mixdi/chat").send({ ...prompt("ticket", project.id, content), conversationId: first.conversationId })));
+    expect(requests.some((r) => r.status === 201)).toBe(true);
+    expect(requests.every((r) => [201, 409].includes(r.status))).toBe(true);
+    const loaded = (await owner.api(org).get(`/api/mixdi/conversations/${first.conversationId}`).expect(200)).body;
+    expect(loaded.messages).toHaveLength(2 + 2 * requests.filter((r) => r.status === 201).length);
+  });
+  it("uses the current epic's ID as parent and obeys project hierarchy", async () => {
+    provider(answer);
+    const hierarchyProject = (await owner.api(org).post("/api/projects").send({ name: "Hierarchy", key: "HIE", itemTypes: ["epic", "story", "task", "subtask"] }).expect(201)).body;
+    const epic = (await owner.api(org).post("/api/items").send({ projectId: hierarchyProject.id, type: "epic", title: "Current epic" }).expect(201)).body;
+    await owner.api(org).put("/api/mixdi/settings").send({ ...settings, projectIds: [...settings.projectIds, hierarchyProject.id] }).expect(200);
+    const draft = (await owner.api(org).post("/api/mixdi/chat").send({ ...prompt("ticket", hierarchyProject.id), parentId: epic.id }).expect(201)).body;
+    const saved = (await owner.api(org).get(`/api/mixdi/conversations/${draft.conversationId}`).expect(200)).body;
+    expect(saved.parentId).toBe(epic.id);
+    const created = (await owner.api(org).post(`/api/mixdi/drafts/${draft.draftId}/create`).expect(201)).body;
+    const item = (await owner.api(org).get(`/api/items/by-key/${created.url.split("/").at(-1)}`).expect(200)).body;
+    expect(item.parentId).toBe(epic.id);
+    await owner.api(org).put("/api/mixdi/settings").send(settings).expect(200);
+  });
+});
+
+describe("Mixdi model tests", () => {
+  it("requires admin access and leaves settings, history and tickets unchanged", async () => {
+    const mock = provider({ message: "Mixdi is ready", draft: null });
+    await member.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", provider: "openai" }).expect(403);
+    expect(mock).not.toHaveBeenCalled();
+    const before = (await owner.api(org).get("/api/mixdi/settings").expect(200)).body;
+    const history = (await owner.api(org).get("/api/mixdi/conversations").expect(200)).body;
+    const tickets = (await owner.api(org).get(`/api/projects/${project.id}/items`).expect(200)).body;
+    const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", provider: "openai" }).expect(201)).body;
+    expect(result).toEqual([expect.objectContaining({ provider: "openai", model: "test-model", ok: true })]);
+    expect(JSON.stringify(result)).not.toContain("private-key");
+    expect((await owner.api(org).get("/api/mixdi/settings")).body).toEqual(before);
+    expect((await owner.api(org).get("/api/mixdi/conversations")).body).toEqual(history);
+    expect((await owner.api(org).get(`/api/projects/${project.id}/items`)).body).toEqual(tickets);
+  });
+  it("tests unsaved fields with saved or replacement credentials without persisting either", async () => {
+    const mock = provider({ message: "OK", draft: null });
+    const edited = structuredClone(settings.providers);
+    edited.openai.model = "unsaved-model"; delete edited.openai.apiKey;
+    const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", providers: edited, provider: "openai" }).expect(201)).body;
+    expect(result[0]).toMatchObject({ model: "unsaved-model", ok: true });
+    expect((mock.mock.calls[0][1]!.headers as any).authorization).toBe("Bearer private-key");
+    edited.openai.apiKey = "unsaved-secret";
+    await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", providers: edited, provider: "openai" }).expect(201);
+    expect((mock.mock.calls.at(-1)![1]!.headers as any).authorization).toBe("Bearer unsaved-secret");
+    expect((await owner.api(org).get("/api/mixdi/settings")).body.providers.openai.model).toBe("test-model");
+  });
+  it("tests shared providers without using dedicated overrides", async () => {
+    const mock = provider({ message: "OK", draft: null });
+    const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "shared", provider: "openai", providers: settings.providers }).expect(201)).body;
+    expect(result[0]).toMatchObject({ model: "shared-model", ok: true });
+    expect((mock.mock.calls[0][1]!.headers as any).authorization).toBe("Bearer shared-key");
+    const info = (await owner.api(org).get("/api/mixdi/settings")).body;
+    expect(info.sharedProviders.openai).toMatchObject({ model: "shared-model", configured: true });
+    expect(JSON.stringify(info)).not.toContain("shared-key");
+  });
+  it("reports each configured provider independently rather than hiding failures with fallback", async () => {
+    const mock = provider({ message: "OK", draft: null });
+    mock.mockImplementation(async (url) => String(url).includes("api.openai.com") ? Response.json({ error: { message: "private-key" } }, { status: 401 }) : Response.json({ message: { content: JSON.stringify({ message: "OK", draft: null }) } }));
+    const edited = structuredClone(settings.providers);
+    edited.ollama = { model: "ollama-test", apiKey: "other-secret" };
+    const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", providers: edited }).expect(201)).body;
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(expect.arrayContaining([expect.objectContaining({ provider: "ollama", ok: true }), expect.objectContaining({ provider: "openai", ok: false, category: "credentials", status: 401 })]));
+    expect(JSON.stringify(result)).not.toContain("private-key");
+  });
+  it("reports missing configuration without contacting a provider", async () => {
+    const mock = provider({ message: "OK", draft: null });
+    const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", provider: "custom" }).expect(201)).body;
+    expect(result[0]).toMatchObject({ ok: false, category: "configuration" });
+    expect(mock).not.toHaveBeenCalled();
+    const empty = Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: "", apiKey: "" }]));
+    await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", providers: empty }).expect(400);
+  });
+});

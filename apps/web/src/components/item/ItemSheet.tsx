@@ -4,6 +4,7 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@
 import { ItemDetail } from "@/components/item/ItemDetail";
 import { useItemSheet } from "@/hooks/ui";
 import { projectKeyOf } from "@/lib/project";
+import { MixdiLauncher } from "@/components/layout/MixdiLauncher";
 
 /** Quick-view panel, opened from the board or lists via `?item=KEY`. */
 export function ItemSheet() {
@@ -31,6 +32,7 @@ export function ItemSheet() {
             onDeleted={close}
           />
         )}
+        {openKey && <MixdiLauncher key={openKey} itemKey={openKey} inItemSheet />}
       </SheetContent>
     </Sheet>
   );
