@@ -88,6 +88,7 @@ export type ProjectWithAccess = Project & { access: ProjectAccessInfo };
 
 export const api = {
   mixdi: {
+    testModels: (input: import("@mixedlane/shared").MixdiModelTestInput) => request<import("@mixedlane/shared").MixdiModelTestResult[]>("/mixdi/settings/test", json("POST", input)),
     history: () => request<import("@mixedlane/shared").MixdiConversationSummary[]>("/mixdi/conversations"),
     conversation: (id: string) => request<import("@mixedlane/shared").MixdiConversation>(`/mixdi/conversations/${id}`),
     removeConversation: (id: string) => request<void>(`/mixdi/conversations/${id}`, { method: "DELETE" }),

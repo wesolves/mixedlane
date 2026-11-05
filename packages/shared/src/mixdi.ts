@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ITEM_TYPES, PRIORITIES } from "./hierarchy";
-import { whatsappSettingsSchema } from "./whatsapp";
+import { AI_PROVIDERS, whatsappSettingsSchema } from "./whatsapp";
 
 export const mixdiSettingsSchema = z.object({
   enabled: z.boolean(),
@@ -15,7 +15,19 @@ export const mixdiSettingsSchema = z.object({
 export type MixdiSettingsInput = z.infer<typeof mixdiSettingsSchema>;
 export type MixdiSettings = Omit<MixdiSettingsInput, "providers"> & {
   providers: Record<string, { model: string; configured: boolean; url?: string }>;
+  sharedProviders: Record<string, { model: string; configured: boolean; url?: string }>;
 };
+export const mixdiModelTestSchema = z.object({
+  providerMode: z.enum(["shared", "dedicated"]),
+  providers: whatsappSettingsSchema.shape.providers.optional(),
+  provider: z.enum(AI_PROVIDERS).optional(),
+});
+export type MixdiModelTestInput = z.infer<typeof mixdiModelTestSchema>;
+export type MixdiModelTestCategory = "configuration" | "credentials" | "model" | "rate_limit" | "timeout" | "network" | "invalid_output" | "provider_error";
+export interface MixdiModelTestResult {
+  provider: typeof AI_PROVIDERS[number]; model: string; ok: boolean; durationMs: number;
+  category?: MixdiModelTestCategory; status?: number; message: string;
+}
 export const mixdiDraftSchema = z.object({
   title: z.string().trim().min(1).max(300),
   description: z.string().max(30000),

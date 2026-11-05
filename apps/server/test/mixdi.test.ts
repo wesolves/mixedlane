@@ -221,3 +221,59 @@ describe("saved Mixdi conversations", () => {
     await owner.api(org).put("/api/mixdi/settings").send(settings).expect(200);
   });
 });
+
+describe("Mixdi model tests", () => {
+  it("requires admin access and leaves settings, history and tickets unchanged", async () => {
+    const mock = provider({ message: "Mixdi is ready", draft: null });
+    await member.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", provider: "openai" }).expect(403);
+    expect(mock).not.toHaveBeenCalled();
+    const before = (await owner.api(org).get("/api/mixdi/settings").expect(200)).body;
+    const history = (await owner.api(org).get("/api/mixdi/conversations").expect(200)).body;
+    const tickets = (await owner.api(org).get(`/api/projects/${project.id}/items`).expect(200)).body;
+    const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", provider: "openai" }).expect(201)).body;
+    expect(result).toEqual([expect.objectContaining({ provider: "openai", model: "test-model", ok: true })]);
+    expect(JSON.stringify(result)).not.toContain("private-key");
+    expect((await owner.api(org).get("/api/mixdi/settings")).body).toEqual(before);
+    expect((await owner.api(org).get("/api/mixdi/conversations")).body).toEqual(history);
+    expect((await owner.api(org).get(`/api/projects/${project.id}/items`)).body).toEqual(tickets);
+  });
+  it("tests unsaved fields with saved or replacement credentials without persisting either", async () => {
+    const mock = provider({ message: "OK", draft: null });
+    const edited = structuredClone(settings.providers);
+    edited.openai.model = "unsaved-model"; delete edited.openai.apiKey;
+    const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", providers: edited, provider: "openai" }).expect(201)).body;
+    expect(result[0]).toMatchObject({ model: "unsaved-model", ok: true });
+    expect((mock.mock.calls[0][1]!.headers as any).authorization).toBe("Bearer private-key");
+    edited.openai.apiKey = "unsaved-secret";
+    await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", providers: edited, provider: "openai" }).expect(201);
+    expect((mock.mock.calls.at(-1)![1]!.headers as any).authorization).toBe("Bearer unsaved-secret");
+    expect((await owner.api(org).get("/api/mixdi/settings")).body.providers.openai.model).toBe("test-model");
+  });
+  it("tests shared providers without using dedicated overrides", async () => {
+    const mock = provider({ message: "OK", draft: null });
+    const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "shared", provider: "openai", providers: settings.providers }).expect(201)).body;
+    expect(result[0]).toMatchObject({ model: "shared-model", ok: true });
+    expect((mock.mock.calls[0][1]!.headers as any).authorization).toBe("Bearer shared-key");
+    const info = (await owner.api(org).get("/api/mixdi/settings")).body;
+    expect(info.sharedProviders.openai).toMatchObject({ model: "shared-model", configured: true });
+    expect(JSON.stringify(info)).not.toContain("shared-key");
+  });
+  it("reports each configured provider independently rather than hiding failures with fallback", async () => {
+    const mock = provider({ message: "OK", draft: null });
+    mock.mockImplementation(async (url) => String(url).includes("api.openai.com") ? Response.json({ error: { message: "private-key" } }, { status: 401 }) : Response.json({ message: { content: JSON.stringify({ message: "OK", draft: null }) } }));
+    const edited = structuredClone(settings.providers);
+    edited.ollama = { model: "ollama-test", apiKey: "other-secret" };
+    const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", providers: edited }).expect(201)).body;
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(expect.arrayContaining([expect.objectContaining({ provider: "ollama", ok: true }), expect.objectContaining({ provider: "openai", ok: false, category: "credentials", status: 401 })]));
+    expect(JSON.stringify(result)).not.toContain("private-key");
+  });
+  it("reports missing configuration without contacting a provider", async () => {
+    const mock = provider({ message: "OK", draft: null });
+    const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", provider: "custom" }).expect(201)).body;
+    expect(result[0]).toMatchObject({ ok: false, category: "configuration" });
+    expect(mock).not.toHaveBeenCalled();
+    const empty = Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: "", apiKey: "" }]));
+    await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", providers: empty }).expect(400);
+  });
+});
