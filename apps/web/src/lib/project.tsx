@@ -33,7 +33,7 @@ export function useProjectScope(): Scope {
 
 const org = () => `/${getCurrentOrg() ?? ""}`;
 
-export type OrgSettingsTab = "general" | "members" | "teams" | "agents" | "integrations";
+export type OrgSettingsTab = "general" | "members" | "teams" | "agents" | "mixdi" | "integrations";
 
 export const paths = {
   projects: () => `${org()}/projects`,

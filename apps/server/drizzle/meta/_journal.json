@@ -113,6 +113,13 @@
       "when": 1793599200000,
       "tag": "0015_whatsapp_session_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793900000000,
+      "tag": "0016_mixdi",
+      "breakpoints": true
     }
   ]
 }

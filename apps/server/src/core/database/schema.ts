@@ -22,6 +22,23 @@ const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull(
 const updatedAt = () => timestamp("updated_at", { withTimezone: true }).notNull().defaultNow();
 const ts = (name: string) => timestamp(name, { withTimezone: true });
 
+export const mixdiSettings = pgTable("mixdi_settings", {
+  orgId: uuid("org_id").primaryKey().references(() => orgs.id, { onDelete: "cascade" }),
+  settings: jsonb("settings").notNull().$type<Omit<import("@mixedlane/shared").MixdiSettingsInput, "providers">>(),
+  providersEnc: text("providers_enc").notNull(),
+});
+export const mixdiDrafts = pgTable("mixdi_drafts", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  request: jsonb("request").notNull().$type<Pick<import("@mixedlane/shared").MixdiChat, "kind" | "destination" | "parentId">>(),
+  draft: jsonb("draft").notNull().$type<import("zod").z.infer<typeof import("@mixedlane/shared").mixdiDraftSchema>>(),
+  status: text("status").notNull().default("pending"),
+  claimedAt: ts("claimed_at"),
+  result: jsonb("result").$type<import("@mixedlane/shared").MixdiResult>(),
+  createdAt: createdAt(),
+});
+
 /* ================= Identity & tenancy ================= */
 
 export const users = pgTable("users", {

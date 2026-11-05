@@ -13,7 +13,7 @@ import {
 import type { z } from "zod";
 import type { pageCreateSchema, pageMoveSchema, pageUpdateSchema, spaceCreateSchema, spaceUpdateSchema } from "@mixedlane/shared";
 import type { RequestContext } from "../../core/context";
-import { DB, type Db, type Executor } from "../../core/database/database";
+import { DB, type Db, type Executor, type Tx } from "../../core/database/database";
 import { pageItemLinks, pageVersions, pages, projects, spaces, workItems } from "../../core/database/schema";
 import { EventBus } from "../../core/events";
 import { htmlToText } from "../../core/html";
@@ -217,7 +217,7 @@ export class DocsService {
     if (!parent || parent.spaceId !== spaceId) throw new AppError(400, "The parent page must be in the same space");
   }
 
-  async createPage(ctx: RequestContext, spaceKey: string, input: PageCreate): Promise<PageDetail> {
+  async createPage(ctx: RequestContext, spaceKey: string, input: PageCreate, onCreated?: (tx: Tx, page: PageRow) => Promise<void>): Promise<PageDetail> {
     const { space } = await this.space(ctx, spaceKey, "write");
     if (input.parentId) await this.assertParent(ctx, space.id, input.parentId);
     const [{ max }] = await this.db
@@ -249,6 +249,7 @@ export class DocsService {
       await this.saveVersion(tx, row, author);
       await this.setLinks(tx, row.id, linkIds);
       await tx.update(spaces).set({ updatedAt: new Date() }).where(eq(spaces.id, space.id));
+      await onCreated?.(tx, row);
       return row;
     });
     this.events.emit("page", { orgId: ctx.orgId, action: "created", page, actor: ctx.actor });

@@ -6,3 +6,4 @@ export * from "./auth";
 export * from "./collab";
 export * from "./agents";
 export * from "./whatsapp";
+export * from "./mixdi";

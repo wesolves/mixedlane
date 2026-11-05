@@ -87,6 +87,13 @@ const json = (method: string, body: unknown): RequestInit => ({ method, body: JS
 export type ProjectWithAccess = Project & { access: ProjectAccessInfo };
 
 export const api = {
+  mixdi: {
+    settings: () => request<import("@mixedlane/shared").MixdiSettings>("/mixdi/settings"),
+    save: (input: import("@mixedlane/shared").MixdiSettingsInput) => request<import("@mixedlane/shared").MixdiSettings>("/mixdi/settings", json("PUT", input)),
+    access: () => request<import("@mixedlane/shared").MixdiAccess>("/mixdi/access"),
+    chat: (input: import("@mixedlane/shared").MixdiChat) => request<import("@mixedlane/shared").MixdiReply>("/mixdi/chat", json("POST", input)),
+    create: (id: string) => request<import("@mixedlane/shared").MixdiResult>(`/mixdi/drafts/${id}/create`, json("POST", {})),
+  },
   whatsapp: {
     settings: () => request<import("@mixedlane/shared").WhatsappSettingsInfo>("/whatsapp/settings"),
     save: (input: import("@mixedlane/shared").WhatsappSettingsInput) => request<import("@mixedlane/shared").WhatsappSettingsInfo>("/whatsapp/settings", json("PUT", input)),
