@@ -138,6 +138,10 @@ export function AppLayout() {
             {!collapsed && "All projects"}
           </NavLink>
           <NotificationBell collapsed={collapsed} className={cn(navItem(false), "mt-0.5 w-full")} />
+          <NavLink aria-label="Mixdi" to={`/${org?.slug}/mixdi`} className={({ isActive }) => cn(navItem(isActive), "mt-0.5")}>
+            <Bot className="size-4" />
+            {!collapsed && "Mixdi"}
+          </NavLink>
           <NavLink aria-label="Docs" to={paths.docs()} className={({ isActive }) => cn(navItem(isActive), "mt-0.5")}>
             <BookOpen className="size-4" />
             {!collapsed && "Docs"}

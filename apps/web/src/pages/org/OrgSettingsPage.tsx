@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, UserAvatar } from "@/components/common";
 import { IntegrationsPage } from "@/pages/IntegrationsPage";
 import { AgentsTab } from "@/pages/org/AgentsTab";
+import { MixdiSettingsTab } from "@/pages/org/MixdiSettings";
 import { api } from "@/lib/api";
 import { useAuth, useOrg } from "@/lib/auth";
 import { paths, type OrgSettingsTab } from "@/lib/project";
@@ -29,6 +30,7 @@ const TABS: { id: OrgSettingsTab; label: string; icon: typeof Users }[] = [
   { id: "members", label: "Members", icon: Users },
   { id: "teams", label: "Teams", icon: Users },
   { id: "agents", label: "AI agents", icon: Bot },
+  { id: "mixdi", label: "Mixdi", icon: Bot },
   { id: "integrations", label: "Integrations", icon: Plug },
 ];
 
@@ -64,6 +66,7 @@ export function OrgSettingsPage() {
         {tab === "members" && <MembersTab />}
         {tab === "teams" && <TeamsTab />}
         {tab === "agents" && <AgentsTab />}
+        {tab === "mixdi" && <MixdiSettingsTab />}
         {tab === "integrations" && <IntegrationsPage embedded />}
       </main>
     </div>

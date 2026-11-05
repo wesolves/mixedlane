@@ -495,6 +495,12 @@ If switching an existing installation, stop its stack first using the original C
 - The full test suite passes against PGlite and against Postgres 17.
 - A smoke test against the compose stack passed: health, SPA and CSP, registration, docs search, S3 upload and range reads, an agent over MCP, and live socket delivery.
 
+## Mixdi in-app creation agent
+
+Owners and admins configure **Settings → Mixdi**: enable the assistant, reuse WhatsApp AI providers or configure dedicated providers, select allowed users (including admins), and allow ticket/document creation in explicitly selected projects/spaces. Empty user or destination selections grant no access. Credentials are encrypted at rest and never returned to the browser. Mixdi always acts within the signed-in user's current permissions.
+
+Open **Mixdi** in the sidebar, choose a destination and optional parent, then chat to create and refine a draft. Review the draft and select **Create** to save it. LangChain handles provider fallback and LangGraph runs drafting and validation. Draft creation is scoped to its author and retries are idempotent; drafts expire after 24 hours. Conversation text stays in the current browser session; only generated drafts and creation results are persisted. This release has no retrieval tools. TODO: embeddings and semantic search (**MIX-0029**), then ticket/document search, summaries and research (**MIX-0030**).
+
 ## WhatsApp intake and AI triage
 
 Owners and admins configure **Settings → Integrations → WhatsApp** with an OpenWA gateway URL and API key, plus a Mixedlane base URL reachable from that gateway. Link an existing OpenWA session, or add an account and scan its QR directly inside Mixedlane. The integration targets OpenWA's session-based REST API (`/api/sessions`, verified against v0.24.0), not the separate `@open-wa/wa-automate` API.
