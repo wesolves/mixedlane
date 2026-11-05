@@ -43,6 +43,7 @@ import { useCreateItemDialog } from "@/components/create/CreateItemDialog";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { ItemSheet } from "@/components/item/ItemSheet";
+import { MixdiLauncher } from "@/components/layout/MixdiLauncher";
 import { useProjects } from "@/hooks/queries";
 import { useHotkey, useTheme } from "@/hooks/ui";
 import { api } from "@/lib/api";
@@ -225,6 +226,7 @@ export function AppLayout() {
       </main>
 
       <ItemSheet />
+      <MixdiLauncher key={org?.id} />
       <CommandPalette
         open={paletteOpen}
         onOpenChange={setPaletteOpen}

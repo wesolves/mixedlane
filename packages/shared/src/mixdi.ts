@@ -31,9 +31,16 @@ export const mixdiChatSchema = z.object({
   destination: z.string().uuid(),
   parentId: z.string().uuid().nullable().default(null),
   previousDraftId: z.string().uuid().optional(),
+  conversationId: z.string().uuid().optional(),
   messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(8000) })).min(1).max(30),
 }).refine((v) => v.messages.at(-1)?.role === "user", "End with a user message");
 export type MixdiChat = z.infer<typeof mixdiChatSchema>;
-export type MixdiReply = z.infer<typeof mixdiReplySchema> & { draftId?: string };
+export type MixdiReply = z.infer<typeof mixdiReplySchema> & { draftId?: string; conversationId?: string };
+export interface MixdiConversationSummary {
+  id: string; title: string; kind: "ticket" | "document"; destination: string; parentId: string | null; updatedAt: string;
+}
+export interface MixdiConversation extends MixdiConversationSummary {
+  messages: MixdiChat["messages"]; reply: MixdiReply | null; result: MixdiResult | null;
+}
 export interface MixdiResult { url: string; title: string }
 export interface MixdiAccess { allowed: boolean; createTickets: boolean; createDocuments: boolean; projectIds: string[]; spaceIds: string[] }

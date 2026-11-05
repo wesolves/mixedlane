@@ -39,6 +39,19 @@ export const mixdiDrafts = pgTable("mixdi_drafts", {
   createdAt: createdAt(),
 });
 
+export const mixdiConversations = pgTable("mixdi_conversations", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  context: jsonb("context").notNull().$type<Pick<import("@mixedlane/shared").MixdiChat, "kind" | "destination" | "parentId">>(),
+  messages: jsonb("messages").notNull().$type<import("@mixedlane/shared").MixdiChat["messages"]>(),
+  draftId: uuid("draft_id").references(() => mixdiDrafts.id, { onDelete: "set null" }),
+  version: integer("version").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index("mixdi_conversations_owner_idx").on(t.orgId, t.userId, t.updatedAt)]);
+
 /* ================= Identity & tenancy ================= */
 
 export const users = pgTable("users", {

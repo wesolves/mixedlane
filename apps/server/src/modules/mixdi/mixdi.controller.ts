@@ -1,4 +1,4 @@
-import { Controller, Get, Module, Param, ParseUUIDPipe, Post, Put } from "@nestjs/common";
+import { Controller, Delete, Get, Module, Param, ParseUUIDPipe, Post, Put } from "@nestjs/common";
 import { ApiBearerAuth, ApiHeader, ApiTags } from "@nestjs/swagger";
 import { mixdiChatSchema, mixdiSettingsSchema, type MixdiChat, type MixdiSettingsInput } from "@mixedlane/shared";
 import { Ctx, type RequestContext } from "../../core/context";
@@ -17,6 +17,9 @@ export class MixdiController {
   @Put("settings") save(@Ctx() ctx: RequestContext, @ZBody(mixdiSettingsSchema) body: MixdiSettingsInput) { return this.mixdi.save(ctx, body); }
   @Get("access") access(@Ctx() ctx: RequestContext) { return this.mixdi.availability(ctx); }
   @Post("chat") chat(@Ctx() ctx: RequestContext, @ZBody(mixdiChatSchema) body: MixdiChat) { return this.mixdi.chat(ctx, body); }
+  @Get("conversations") history(@Ctx() ctx: RequestContext) { return this.mixdi.history(ctx); }
+  @Get("conversations/:id") conversation(@Ctx() ctx: RequestContext, @Param("id", ParseUUIDPipe) id: string) { return this.mixdi.conversation(ctx, id); }
+  @Delete("conversations/:id") removeConversation(@Ctx() ctx: RequestContext, @Param("id", ParseUUIDPipe) id: string) { return this.mixdi.removeConversation(ctx, id); }
   @Post("drafts/:id/create") create(@Ctx() ctx: RequestContext, @Param("id", ParseUUIDPipe) id: string) { return this.mixdi.create(ctx, id); }
 }
 @Module({ imports: [WorkModule, DocsModule], controllers: [MixdiController], providers: [MixdiService] })
