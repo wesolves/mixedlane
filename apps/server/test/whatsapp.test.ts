@@ -118,6 +118,32 @@ describe("WhatsApp integration", () => {
     } finally { await db.update(whatsappConnections).set({ providersEnc: before.providersEnc }).where(eq(whatsappConnections.orgId, orgId)); }
   });
 
+  it("removes saved providers without gateway calls and persists the default/fallback order", async () => {
+    const [before] = await db.select().from(whatsappConnections).where(eq(whatsappConnections.orgId, orgId));
+    const info = (await owner.api(org).get("/api/whatsapp/settings")).body;
+    const { AI_PROVIDERS } = await import("@mixedlane/shared");
+    const configured = Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: "test-model", apiKey: `${p}-test-key`, ...(p === "custom" ? { url: "https://custom.test/chat" } : {}) }]));
+    const mock = vi.fn().mockRejectedValue(new Error("Gateway offline")); vi.stubGlobal("fetch", mock);
+    try {
+      const setup = await owner.api(org).put("/api/whatsapp/settings").send({ ...info, providers: configured, providerOrder: ["custom", "anthropic", "openai"] }).expect(200);
+      expect(setup.body.providerOrder.slice(0, 3)).toEqual(["custom", "anthropic", "openai"]);
+      const remove = { ...setup.body, providers: Object.fromEntries(AI_PROVIDERS.map((p) => [p, { removeCredentials: true }])) };
+      await member.api(org).put("/api/whatsapp/settings").send(remove).expect(403);
+      const result = (await owner.api(org).put("/api/whatsapp/settings").send(remove).expect(200)).body;
+      for (const provider of AI_PROVIDERS) expect(result.providers[provider]).toMatchObject({ model: "", configured: false });
+      expect(result.providers.custom.url).toBe("");
+      const [row] = await db.select().from(whatsappConnections).where(eq(whatsappConnections.orgId, orgId));
+      for (const provider of Object.values(JSON.parse(decrypt(row.providersEnc))) as any[]) expect(provider.apiKey).toBe("");
+      expect(row.apiKeyEnc).toBeDefined(); expect(decrypt(row.apiKeyEnc)).toBe(decrypt(before.apiKeyEnc));
+      expect(row.providerOrder.slice(0, 3)).toEqual(["custom", "anthropic", "openai"]);
+      await owner.api(org).post("/api/whatsapp/settings/models").send({ provider: "openai" }).expect(400);
+      const reloaded = (await owner.api(org).get("/api/whatsapp/settings")).body;
+      expect(reloaded).toEqual(result);
+      await owner.api(org).put("/api/whatsapp/settings").send({ ...remove, providerOrder: ["openai", "openai"] }).expect(400);
+      expect(mock).not.toHaveBeenCalled();
+    } finally { await db.update(whatsappConnections).set({ providersEnc: before.providersEnc, providerOrder: before.providerOrder }).where(eq(whatsappConnections.orgId, orgId)); }
+  });
+
   it("keeps saved accounts visible when the gateway cannot be reached", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
     const result = (await owner.api(org).get("/api/whatsapp/sessions").expect(200)).body;
