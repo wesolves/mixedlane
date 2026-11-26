@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
-import { AI_PROVIDERS, canHaveParent, itemCreateSchema, type MixdiChat, type MixdiSettingsInput, type MixdiAccess, type MixdiResult, type MixdiModelTestInput, type MixdiModelTestResult } from "@mixedlane/shared";
+import { AI_PROVIDERS, canHaveParent, itemCreateSchema, type MixdiChat, type MixdiSettingsInput, type MixdiAccess, type MixdiResult, type MixdiModelListInput, type MixdiModelTestInput, type MixdiModelTestResult } from "@mixedlane/shared";
 import { DB, type Db } from "../../core/database/database";
 import { mixdiSettings, mixdiDrafts, mixdiConversations, orgMembers, projects, spaces, whatsappConnections } from "../../core/database/schema";
 import type { RequestContext } from "../../core/context";
@@ -16,6 +16,7 @@ import { whatsappBootstrap } from "../whatsapp/bootstrap";
 import type { ProviderConfig } from "../whatsapp/triage";
 import { runMixdi } from "./workflow";
 import { invokeMixdiProvider, MixdiProviderError } from "./provider";
+import { listProviderModels } from "../ai/models";
 
 const defaults = { enabled: false, providerMode: "shared" as const, userIds: [] as string[], createTickets: false, createDocuments: false, projectIds: [] as string[], spaceIds: [] as string[] };
 @Injectable()
@@ -32,6 +33,12 @@ export class MixdiService {
     const row = await this.config(orgId);
     const previous: ProviderConfig = row ? JSON.parse(decrypt(row.providersEnc)) : {};
     return input ? Object.fromEntries(AI_PROVIDERS.map((p) => [p, { ...input[p], apiKey: input[p].apiKey ?? previous[p]?.apiKey ?? "" }])) : previous;
+  }
+  async models(ctx: RequestContext, input: MixdiModelListInput) {
+    requireOrg(ctx, "org.manage");
+    if (input.providerMode === "dedicated" && input.apiKey) return listProviderModels(input.provider, input.apiKey);
+    const providers = input.providerMode === "shared" ? await this.sharedProviders(ctx.orgId) : await this.dedicatedProviders(ctx.orgId);
+    return listProviderModels(input.provider, providers[input.provider]?.apiKey);
   }
   async testModels(ctx: RequestContext, input: MixdiModelTestInput): Promise<MixdiModelTestResult[]> {
     requireOrg(ctx, "org.manage");

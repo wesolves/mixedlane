@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { ITEM_TYPES, PRIORITIES } from "./hierarchy";
-import { AI_PROVIDERS, whatsappSettingsSchema } from "./whatsapp";
+import { AI_PROVIDERS, aiModelListSchema, whatsappSettingsSchema } from "./whatsapp";
+
+export const mixdiModelListSchema = aiModelListSchema.extend({ providerMode: z.enum(["shared", "dedicated"]) });
+export type MixdiModelListInput = z.infer<typeof mixdiModelListSchema>;
 
 export const mixdiSettingsSchema = z.object({
   enabled: z.boolean(),

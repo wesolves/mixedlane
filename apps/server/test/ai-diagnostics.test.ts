@@ -47,3 +47,20 @@ it("keeps a failed attempt correlated when a fallback succeeds", async () => {
   expect(JSON.stringify(records)).not.toContain(input.report);
   expect(JSON.stringify(records)).not.toContain("SECRET-KEY");
 });
+
+it("uses native Anthropic messages and falls back after an Anthropic error", async () => {
+  const records = capture();
+  const mock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ content: [{ type: "text", text: JSON.stringify(proposal) }] }));
+  const configuration = { anthropic: { model: "claude-test", apiKey: "PRIVATE-KEY" } };
+  expect((await triage(input, configuration)).provider).toBe("anthropic");
+  expect(mock.mock.calls[0][0]).toBe("https://api.anthropic.com/v1/messages");
+  const body = JSON.parse(String(mock.mock.calls[0][1]?.body));
+  expect(body).toMatchObject({ model: "claude-test", max_tokens: 4096, messages: [{ role: "user" }] });
+  expect(body.system).toContain("triage");
+  expect(body.response_format).toBeUndefined();
+  mock.mockResolvedValueOnce(Response.json({ error: { message: "PRIVATE-KEY" } }, { status: 429 }))
+    .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: JSON.stringify(proposal) } }] }));
+  expect((await triage(input, { ...configuration, custom: { model: "custom-test", apiKey: "OTHER-KEY", url: "https://custom.test/chat" } })).provider).toBe("custom");
+  expect(records.some((record) => record.event === "ai.attempt_failed" && record.provider === "anthropic" && record.category === "rate_limit")).toBe(true);
+  expect(JSON.stringify(records)).not.toContain("PRIVATE-KEY");
+});

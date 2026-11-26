@@ -7,14 +7,20 @@ const messages = [{ role: "user" as const, content: "Synthetic model test" }];
 const reply = JSON.stringify({ message: "Ready", draft: null });
 
 describe("Mixdi provider requests", () => {
-  it.each(["ollama", "gemini", "grok", "openai", "custom"] as const)("uses %s request and response formats", async (provider) => {
-    const mock = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(provider === "ollama" ? { message: { content: reply } } : provider === "gemini" ? { candidates: [{ content: { parts: [{ thought: true, text: "ignore reasoning" }, { text: reply }] } }] } : { choices: [{ message: { content: reply } }] }));
+  it.each(["ollama", "gemini", "grok", "openai", "anthropic", "custom"] as const)("uses %s request and response formats", async (provider) => {
+    const mock = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(provider === "anthropic" ? { content: [{ type: "thinking", thinking: "ignore reasoning" }, { type: "text", text: reply }] } : provider === "ollama" ? { message: { content: reply } } : provider === "gemini" ? { candidates: [{ content: { parts: [{ thought: true, text: "ignore reasoning" }, { text: reply }] } }] } : { choices: [{ message: { content: reply } }] }));
     expect(await invokeMixdiProvider(provider, configuration, "System prompt", messages)).toEqual({ message: "Ready", draft: null });
     const [url, request] = mock.mock.calls[0];
     const body = JSON.parse(request!.body as string);
     expect(request!.redirect).toBe("error");
     expect(body.model ?? String(url).includes("test-model")).toBeTruthy();
     if (provider === "custom") expect(url).toBe(configuration.url);
+    if (provider === "anthropic") {
+      expect(url).toBe("https://api.anthropic.com/v1/messages");
+      expect(request!.headers).toHaveProperty("anthropic-version");
+      expect(body).toMatchObject({ system: "System prompt", max_tokens: 8192, messages });
+      expect(body.response_format).toBeUndefined();
+    }
     if (provider === "gemini") expect((request!.headers as any)["x-goog-api-key"]).toBe("PRIVATE-KEY");
     else expect((request!.headers as any).authorization).toBe("Bearer PRIVATE-KEY");
   });

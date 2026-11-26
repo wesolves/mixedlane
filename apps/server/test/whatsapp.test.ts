@@ -69,6 +69,79 @@ describe("WhatsApp integration", () => {
     await owner.api(org).get(`/api/whatsapp/sessions/${sessionId}/qr`).expect(200);
     expect(remoteCalls.some((c) => c.url.endsWith("/webhooks") && c.body?.events?.includes("message.received"))).toBe(true);
   });
+
+  it("keeps healthy accounts visible when another remote session is missing", async () => {
+    const missingId = randomUUID();
+    await db.insert(whatsappSessions).values({ id: missingId, orgId, name: "missing-account" });
+    const original = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => String(url).endsWith(`/sessions/${missingId}`)
+      ? new Response("private gateway response", { status: 404 }) : original(url, init)));
+    try {
+      const result = (await owner.api(org).get("/api/whatsapp/sessions").expect(200)).body;
+      expect(result.find((s: any) => s.id === sessionId)).toMatchObject({ status: "qr_ready" });
+      expect(result.find((s: any) => s.id === missingId)).toMatchObject({ name: "missing-account", status: "unavailable", lastError: expect.stringContaining("404") });
+      expect(JSON.stringify(result)).not.toContain("private gateway response");
+    } finally { await db.delete(whatsappSessions).where(eq(whatsappSessions.id, missingId)); }
+  });
+
+  it("discovers models with saved or unsaved keys without changing settings or contacting OpenWA", async () => {
+    const before = (await owner.api(org).get("/api/whatsapp/settings").expect(200)).body;
+    const mock = vi.fn(async () => Response.json({ models: [{ name: "cloud-model" }] }));
+    vi.stubGlobal("fetch", mock);
+    await member.api(org).post("/api/whatsapp/settings/models").send({ provider: "ollama", apiKey: "unsaved-key" }).expect(403);
+    await outsider.api(foreignOrg).post("/api/whatsapp/settings/models").send({ provider: "ollama" }).expect(400);
+    expect(mock).not.toHaveBeenCalled();
+    const saved = await owner.api(org).post("/api/whatsapp/settings/models").send({ provider: "ollama" }).expect(200);
+    expect(saved.body).toEqual([{ id: "cloud-model", name: "cloud-model" }]);
+    expect(saved.headers["cache-control"]).toBe("no-store");
+    expect(mock.mock.calls[0]).toMatchObject([expect.any(URL), { headers: { authorization: "Bearer ollama-secret" } }]);
+    mock.mockImplementation(async () => Response.json({ data: [{ id: "claude-test", display_name: "Claude Test" }], has_more: false }));
+    await owner.api(org).post("/api/whatsapp/settings/models").send({ provider: "anthropic", apiKey: "unsaved-key" }).expect(200);
+    expect(mock.mock.calls[1]).toMatchObject([expect.any(URL), { headers: { authorization: "Bearer unsaved-key" } }]);
+    expect(String((mock.mock.calls[1] as any)[0])).toContain("api.anthropic.com");
+    expect((await owner.api(org).get("/api/whatsapp/settings").expect(200)).body).toEqual(before);
+    await owner.api(org).post("/api/whatsapp/settings/models").send({ provider: "custom", apiKey: "key" }).expect(400);
+  });
+
+  it("stores Anthropic configuration encrypted and preserves it on blank key saves", async () => {
+    const [before] = await db.select().from(whatsappConnections).where(eq(whatsappConnections.orgId, orgId));
+    const info = (await owner.api(org).get("/api/whatsapp/settings").expect(200)).body;
+    const input = { ...info, providers: { ...info.providers, anthropic: { model: "claude-test", apiKey: "anthropic-secret" } } };
+    try {
+      const result = await owner.api(org).put("/api/whatsapp/settings").send(input).expect(200);
+      expect(result.body.providers.anthropic).toEqual({ model: "claude-test", configured: true });
+      expect(JSON.stringify(result.body)).not.toContain("anthropic-secret");
+      await owner.api(org).put("/api/whatsapp/settings").send({ ...input, providers: { ...input.providers, anthropic: { model: "claude-test", apiKey: "" } } }).expect(200);
+      const [row] = await db.select().from(whatsappConnections).where(eq(whatsappConnections.orgId, orgId));
+      expect(row.providersEnc).not.toContain("anthropic-secret");
+      expect(JSON.parse(decrypt(row.providersEnc)).anthropic.apiKey).toBe("anthropic-secret");
+    } finally { await db.update(whatsappConnections).set({ providersEnc: before.providersEnc }).where(eq(whatsappConnections.orgId, orgId)); }
+  });
+
+  it("keeps saved accounts visible when the gateway cannot be reached", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+    const result = (await owner.api(org).get("/api/whatsapp/sessions").expect(200)).body;
+    expect(result.find((s: any) => s.id === sessionId)).toMatchObject({ status: "unavailable", lastError: expect.stringContaining("Cannot reach") });
+    const added = await owner.api(org).post("/api/whatsapp/sessions").send({ name: "new-account" }).expect(502);
+    expect(added.body.error).toContain("Mixedlane API server");
+  });
+
+  it("saves preferences offline but validates new gateway credentials before persisting them", async () => {
+    const info = (await owner.api(org).get("/api/whatsapp/settings").expect(200)).body;
+    // The settings form submits empty password fields to keep saved keys.
+    for (const provider of Object.values(info.providers) as any[]) provider.apiKey = "";
+    const [before] = await db.select().from(whatsappConnections).where(eq(whatsappConnections.orgId, orgId));
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+    vi.stubGlobal("fetch", fetchMock);
+    await owner.api(org).put("/api/whatsapp/settings").send(info).expect(200);
+    expect(fetchMock).not.toHaveBeenCalled();
+    const rejected = await owner.api(org).put("/api/whatsapp/settings").send({ ...info, apiKey: "replacement-key" }).expect(502);
+    expect(rejected.body.error).toContain("Cannot reach");
+    const [after] = await db.select().from(whatsappConnections).where(eq(whatsappConnections.orgId, orgId));
+    expect(decrypt(after.apiKeyEnc)).toBe(decrypt(before.apiKeyEnc));
+    expect(JSON.parse(decrypt(after.providersEnc))).toMatchObject(JSON.parse(decrypt(before.providersEnc)));
+  });
+
   it("creates a ticket manually from a failed report once and exposes its link", async () => {
     const [draft] = await db.insert(whatsappDrafts).values({ orgId, sessionId, messageId: randomUUID(), chatId: `${phone}@c.us`, userId: member.id, projectId: project.id, report: "A saved report", status: "failed", error: "AI unavailable" }).returning();
     const input = { projectId: project.id, type: "task", title: "Manually recovered report", description: "Original report", labels: ["bug"] };

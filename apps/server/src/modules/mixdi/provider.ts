@@ -1,5 +1,6 @@
 import { mixdiReplySchema, type AI_PROVIDERS, type MixdiChat, type MixdiModelTestCategory } from "@mixedlane/shared";
 import { httpFailure, providerCode } from "../whatsapp/ai-diagnostics";
+import { anthropicHeaders, anthropicText } from "../ai/anthropic";
 
 const guidance: Record<MixdiModelTestCategory, string> = {
   configuration: "Enter a model and API key. Custom providers also require a chat completions URL.",
@@ -25,6 +26,10 @@ export async function invokeMixdiProvider(provider: typeof AI_PROVIDERS[number],
     url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     headers = { "x-goog-api-key": apiKey };
     body = { systemInstruction: { parts: [{ text: system }] }, contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })), generationConfig: { responseMimeType: "application/json", maxOutputTokens: maxTokens } };
+  } else if (provider === "anthropic") {
+    url = "https://api.anthropic.com/v1/messages";
+    headers = anthropicHeaders(apiKey);
+    body = { model, system, max_tokens: maxTokens, messages };
   } else {
     url = provider === "ollama" ? "https://ollama.com/api/chat" : provider === "custom" ? customUrl! : provider === "openai" ? "https://api.openai.com/v1/chat/completions" : "https://api.x.ai/v1/chat/completions";
     headers = { authorization: `Bearer ${apiKey}` };
@@ -40,7 +45,7 @@ export async function invokeMixdiProvider(provider: typeof AI_PROVIDERS[number],
   }
   try {
     const data = await response.json() as any;
-    const content = provider === "gemini" ? data.candidates?.[0]?.content?.parts?.filter((p: any) => !p.thought).map((p: any) => p.text ?? "").join("") : provider === "ollama" ? data.message?.content : data.choices?.[0]?.message?.content;
+    const content = provider === "anthropic" ? anthropicText(data) : provider === "gemini" ? data.candidates?.[0]?.content?.parts?.filter((p: any) => !p.thought).map((p: any) => p.text ?? "").join("") : provider === "ollama" ? data.message?.content : data.choices?.[0]?.message?.content;
     return mixdiReplySchema.parse(JSON.parse(content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "")));
   } catch { throw new MixdiProviderError("invalid_output", response.status); }
 }
