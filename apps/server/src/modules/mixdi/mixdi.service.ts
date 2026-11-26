@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { AI_PROVIDERS, normalizeProviderOrder, canHaveParent, itemCreateSchema, type MixdiChat, type MixdiSettingsInput, type MixdiAccess, type MixdiResult, type MixdiModelListInput, type MixdiModelTestInput, type MixdiModelTestResult } from "@mixedlane/shared";
 import { DB, type Db } from "../../core/database/database";
 import { mixdiSettings, mixdiDrafts, mixdiConversations, orgMembers, projects, spaces, whatsappConnections } from "../../core/database/schema";
@@ -70,6 +70,19 @@ export class MixdiService {
     const shared = await this.sharedProviders(ctx.orgId);
     const info = (configs: ProviderConfig) => Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: configs[p]?.model ?? "", configured: !!configs[p]?.apiKey, ...(p === "custom" ? { url: configs[p]?.url ?? "" } : {}) }]));
     return { ...(row?.settings ?? defaults), providerOrder: normalizeProviderOrder(row?.settings.providerOrder), sharedProviderOrder: await this.sharedProviderOrder(ctx.orgId), providers: info(providers), sharedProviders: info(shared) };
+  }
+  async setProviderSource(ctx: RequestContext, providerMode: "shared" | "dedicated") {
+    requireOrg(ctx, "org.manage");
+    const row = await this.config(ctx.orgId);
+    if (!row) throw new AppError(400, "Configure Mixdi before changing its provider source.");
+    const providers = providerMode === "shared" ? await this.sharedProviders(ctx.orgId) : await this.dedicatedProviders(ctx.orgId);
+    if (!AI_PROVIDERS.some((provider) => providers[provider]?.apiKey && providers[provider]?.model && (provider !== "custom" || providers.custom?.url))) {
+      throw new AppError(400, `Save a complete ${providerMode === "shared" ? "integration" : "dedicated Mixdi"} provider before using it in Mixdi.`);
+    }
+    // Update only the source, retaining concurrent edits to grants and all stored credentials.
+    const changed = await this.db.update(mixdiSettings).set({ settings: sql`jsonb_set(${mixdiSettings.settings}, '{providerMode}', ${JSON.stringify(providerMode)}::jsonb)` }).where(eq(mixdiSettings.orgId, ctx.orgId)).returning({ orgId: mixdiSettings.orgId });
+    if (!changed.length) throw new AppError(409, "Mixdi settings changed. Reload and try again.");
+    return this.settings(ctx);
   }
   async save(ctx: RequestContext, input: MixdiSettingsInput) {
     requireOrg(ctx, "org.manage");

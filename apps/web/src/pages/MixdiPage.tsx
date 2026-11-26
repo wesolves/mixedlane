@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { MixdiMarkdown } from "@/components/layout/MixdiMarkdown";
+import { MixdiProviderSourceNotice } from "@/components/MixdiProviderSourceNotice";
 
 export interface MixdiContext { destination?: string; parentId?: string; parentType?: ItemType; parentLabel?: string }
 type Parent = { id: string; title: string; key?: string; type?: ItemType };
@@ -102,6 +103,7 @@ export function MixdiChatView({ initial = {}, compact = false, onNavigate }: { i
     <section aria-label="Mixdi chat" className={cn("flex min-h-0 min-w-0 flex-1 flex-col", showHistory && (compact ? "hidden" : "hidden lg:flex"))}>
       <header className="flex shrink-0 items-center gap-3 border-b px-4 py-3 sm:px-6"><span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Sparkles className="size-5" /></span><div className="min-w-0 flex-1"><h1 className="text-sm font-semibold">Mixdi</h1><p className="truncate text-xs text-muted-foreground">Create together. Keep the conversation.</p></div><Button variant="ghost" size="icon" className={compact ? "" : "lg:hidden"} aria-label="Show chat history" disabled={busy} onClick={() => setShowHistory(true)}><History className="size-4" /></Button><Button variant="outline" size="sm" disabled={busy} onClick={newChat}><Plus className="mr-1 size-3.5" />New chat</Button></header>
       <div className="shrink-0 border-b bg-muted/15 px-4 py-3 sm:px-6">
+        {can("org.manage") && <div className="mb-3"><MixdiProviderSourceNotice /></div>}
         <button className="flex w-full items-center gap-2 text-left text-xs text-muted-foreground" aria-expanded={showContext} onClick={() => setShowContext(!showContext)}><span className="min-w-0 flex-1 truncate"><span className="font-medium text-foreground">{kind === "ticket" ? "Ticket" : "Document"}</span> · {destinationName ?? "Choose a destination"}{parentId ? ` / ${selectedParent?.key ?? ""} ${selectedParent?.title ?? initial.parentLabel ?? "Loading parent…"}` : " / Top level"}</span><ChevronDown className={cn("size-4 shrink-0 transition-transform", showContext && "rotate-180")} /></button>
         {showContext && <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-medium">Create<select disabled={busy} className={selectClass} value={kind} onChange={(e) => { setKind(e.target.value as typeof kind); setDestination(""); setParentId(""); setParentType(""); reset(); }}><option value="ticket" disabled={!access.data.createTickets}>Ticket</option><option value="document" disabled={!access.data.createDocuments}>Document</option></select></label>

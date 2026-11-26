@@ -505,6 +505,8 @@ Open **Mixdi** in the sidebar, choose a destination and optional parent, then ch
 
 Mixdi chat failures include a diagnostic reference. Search the API's `AIIntegration` logs for that reference and `operation: "mixdi_chat"`. Records identify the authorization, conversation, configuration, workflow, permission recheck or persistence stage; saved shared/dedicated provider mode; provider/model attempts; safe failure category/status; and known database error codes. Prompts, SQL text, raw provider responses and credentials are excluded. A successful model test exercises the provider adapter directly; a chat also runs authorization, the workflow and history persistence. If the browser still shows a generic proxy error without a reference, correlate the API records with the failed chat request in the web log.
 
+Integration settings and Mixdi chat show Mixdi's saved active provider source and ordered models to organization admins. If Mixdi uses dedicated providers, saving OpenAI in Integrations does not change that separate configuration. Use **Use saved integration providers in Mixdi** to apply the saved integration keys, models and fallback order to chat. This updates only Mixdi's provider source and retains dedicated credentials, access grants and capabilities. Save any integration edits before applying them.
+
 ## WhatsApp intake and AI triage
 
 Owners and admins configure **Settings → Integrations → WhatsApp** with an OpenWA gateway URL and API key, plus a Mixedlane base URL reachable from that gateway. Link an existing OpenWA session, or add an account and scan its QR directly inside Mixedlane. The integration targets OpenWA's session-based REST API (`/api/sessions`, verified against v0.24.0), not the separate `@open-wa/wa-automate` API.

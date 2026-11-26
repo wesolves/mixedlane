@@ -4,6 +4,8 @@ import { AI_PROVIDERS, aiModelListSchema, providerOrderSchema, whatsappSettingsS
 
 export const mixdiModelListSchema = aiModelListSchema.extend({ providerMode: z.enum(["shared", "dedicated"]) });
 export type MixdiModelListInput = z.infer<typeof mixdiModelListSchema>;
+export const mixdiProviderSourceSchema = z.object({ providerMode: z.enum(["shared", "dedicated"]) });
+export type MixdiProviderSourceInput = z.infer<typeof mixdiProviderSourceSchema>;
 
 export const mixdiSettingsSchema = z.object({
   enabled: z.boolean(),

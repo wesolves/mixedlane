@@ -6,6 +6,7 @@ import { ZBody } from "../../core/zod-body";
 import { WorkModule } from "../work/work.module";
 import { DocsModule } from "../docs/docs.controller";
 import { MixdiService } from "./mixdi.service";
+import { mixdiProviderSourceSchema, type MixdiProviderSourceInput } from "@mixedlane/shared";
 
 @ApiTags("Mixdi")
 @ApiBearerAuth()
@@ -15,6 +16,7 @@ export class MixdiController {
   constructor(private readonly mixdi: MixdiService) {}
   @Get("settings") settings(@Ctx() ctx: RequestContext) { return this.mixdi.settings(ctx); }
   @Put("settings") save(@Ctx() ctx: RequestContext, @ZBody(mixdiSettingsSchema) body: MixdiSettingsInput) { return this.mixdi.save(ctx, body); }
+  @Put("settings/provider-source") setProviderSource(@Ctx() ctx: RequestContext, @ZBody(mixdiProviderSourceSchema) body: MixdiProviderSourceInput) { return this.mixdi.setProviderSource(ctx, body.providerMode); }
   @Post("settings/test") testModels(@Ctx() ctx: RequestContext, @ZBody(mixdiModelTestSchema) body: MixdiModelTestInput) { return this.mixdi.testModels(ctx, body); }
   @Post("settings/models")
   @HttpCode(200)
