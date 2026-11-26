@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
-import { AI_PROVIDERS, canHaveParent, itemCreateSchema, type MixdiChat, type MixdiSettingsInput, type MixdiAccess, type MixdiResult, type MixdiModelListInput, type MixdiModelTestInput, type MixdiModelTestResult } from "@mixedlane/shared";
+import { AI_PROVIDERS, normalizeProviderOrder, canHaveParent, itemCreateSchema, type MixdiChat, type MixdiSettingsInput, type MixdiAccess, type MixdiResult, type MixdiModelListInput, type MixdiModelTestInput, type MixdiModelTestResult } from "@mixedlane/shared";
 import { DB, type Db } from "../../core/database/database";
 import { mixdiSettings, mixdiDrafts, mixdiConversations, orgMembers, projects, spaces, whatsappConnections } from "../../core/database/schema";
 import type { RequestContext } from "../../core/context";
@@ -17,6 +17,7 @@ import type { ProviderConfig } from "../whatsapp/triage";
 import { runMixdi } from "./workflow";
 import { invokeMixdiProvider, MixdiProviderError } from "./provider";
 import { listProviderModels } from "../ai/models";
+import { resolveProviderConfig } from "../ai/provider-config";
 
 const defaults = { enabled: false, providerMode: "shared" as const, userIds: [] as string[], createTickets: false, createDocuments: false, projectIds: [] as string[], spaceIds: [] as string[] };
 @Injectable()
@@ -32,7 +33,11 @@ export class MixdiService {
   private async dedicatedProviders(orgId: string, input?: MixdiSettingsInput["providers"]): Promise<ProviderConfig> {
     const row = await this.config(orgId);
     const previous: ProviderConfig = row ? JSON.parse(decrypt(row.providersEnc)) : {};
-    return input ? Object.fromEntries(AI_PROVIDERS.map((p) => [p, { ...input[p], apiKey: input[p].apiKey ?? previous[p]?.apiKey ?? "" }])) : previous;
+    return input ? resolveProviderConfig(input, previous) : previous;
+  }
+  private async sharedProviderOrder(orgId: string) {
+    const [shared] = await this.db.select().from(whatsappConnections).where(eq(whatsappConnections.orgId, orgId));
+    return normalizeProviderOrder(shared?.providerOrder);
   }
   async models(ctx: RequestContext, input: MixdiModelListInput) {
     requireOrg(ctx, "org.manage");
@@ -63,7 +68,7 @@ export class MixdiService {
     const providers: ProviderConfig = row ? JSON.parse(decrypt(row.providersEnc)) : {};
     const shared = await this.sharedProviders(ctx.orgId);
     const info = (configs: ProviderConfig) => Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: configs[p]?.model ?? "", configured: !!configs[p]?.apiKey, ...(p === "custom" ? { url: configs[p]?.url ?? "" } : {}) }]));
-    return { ...(row?.settings ?? defaults), providers: info(providers), sharedProviders: info(shared) };
+    return { ...(row?.settings ?? defaults), providerOrder: normalizeProviderOrder(row?.settings.providerOrder), sharedProviderOrder: await this.sharedProviderOrder(ctx.orgId), providers: info(providers), sharedProviders: info(shared) };
   }
   async save(ctx: RequestContext, input: MixdiSettingsInput) {
     requireOrg(ctx, "org.manage");
@@ -77,7 +82,8 @@ export class MixdiService {
     const providers = await this.dedicatedProviders(ctx.orgId, input.providers);
     for (const p of AI_PROVIDERS) if (providers[p]?.apiKey && (!providers[p]?.model || (p === "custom" && !providers[p]?.url))) throw new AppError(400, `Configure a model${p === "custom" ? " and URL" : ""} for ${p}.`);
     const { providers: _, ...settings } = input;
-    const values = { orgId: ctx.orgId, settings, providersEnc: encrypt(JSON.stringify(providers)) };
+    const previous = await this.config(ctx.orgId);
+    const values = { orgId: ctx.orgId, settings: { ...settings, providerOrder: normalizeProviderOrder(input.providerOrder ?? previous?.settings.providerOrder) }, providersEnc: encrypt(JSON.stringify(providers)) };
     await this.db.insert(mixdiSettings).values(values).onConflictDoUpdate({ target: mixdiSettings.orgId, set: values });
     return this.settings(ctx);
   }
@@ -151,7 +157,8 @@ export class MixdiService {
     }
     const row = (await this.config(ctx.orgId))!;
     const providers = row.settings.providerMode === "shared" ? await this.sharedProviders(ctx.orgId) : JSON.parse(decrypt(row.providersEnc));
-    const reply = await runMixdi({ ...input, messages: messages.slice(-29) }, { ...context, previousDraft }, providers);
+    const providerOrder = row.settings.providerMode === "shared" ? await this.sharedProviderOrder(ctx.orgId) : normalizeProviderOrder(row.settings.providerOrder);
+    const reply = await runMixdi({ ...input, messages: messages.slice(-29) }, { ...context, previousDraft }, providers, providerOrder);
     await this.authorize(ctx, input); // Permissions may change during provider latency.
     if (reply.draft && input.kind === "ticket" && "enabledTypes" in context && !context.enabledTypes?.includes(reply.draft.type)) throw new AppError(400, "Mixdi selected an invalid ticket type. Choose a valid parent or refine your request.");
     return this.db.transaction(async (tx) => {

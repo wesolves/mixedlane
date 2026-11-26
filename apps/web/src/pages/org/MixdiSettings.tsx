@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, CheckCircle2, ChevronDown, FlaskConical, KeyRound, Loader2, Search, Settings2, ShieldCheck, Sparkles, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { AI_PROVIDERS, type MixdiModelTestResult, type MixdiSettings, type MixdiSettingsInput } from "@mixedlane/shared";
+import { AI_PROVIDERS, normalizeProviderOrder, type MixdiModelTestResult, type MixdiSettings, type MixdiSettingsInput } from "@mixedlane/shared";
 import { api } from "@/lib/api";
 import { useOrg } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ProviderModelSelect } from "@/components/ProviderModelSelect";
+import { ProviderFallbackOrder } from "@/components/ProviderFallbackOrder";
 
 type Provider = typeof AI_PROVIDERS[number];
 const providerNames: Record<Provider, string> = { ollama: "Ollama Cloud", gemini: "Google Gemini", grok: "Grok · xAI", openai: "OpenAI", anthropic: "Anthropic · Claude", custom: "Custom provider" };
 function formValue(settings: MixdiSettings): MixdiSettingsInput {
-  const { providers, sharedProviders: _, ...config } = settings;
+  const { providers, sharedProviders: _, sharedProviderOrder: __, ...config } = settings;
   return { ...config, providers: Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: providers[p]?.model ?? "", ...(p === "custom" ? { url: providers[p]?.url ?? "" } : {}) }])) as MixdiSettingsInput["providers"] };
 }
 
@@ -47,9 +48,10 @@ function SettingsForm({ initial }: { initial: MixdiSettings }) {
     if (!dirty && !locked && initial !== saved) { setSaved(initial); setValue(formValue(initial)); setResults({}); }
   }, [initial, saved, dirty, locked]);
   const shared = value.providerMode === "shared";
-  const hasKey = (p: Provider) => shared ? !!saved.sharedProviders?.[p]?.configured : value.providers[p].apiKey === undefined ? !!saved.providers[p]?.configured : !!value.providers[p].apiKey;
-  const modelFor = (p: Provider) => shared ? saved.sharedProviders?.[p]?.model ?? "" : value.providers[p].model;
-  const configured = AI_PROVIDERS.filter((p) => hasKey(p));
+  const hasKey = (p: Provider) => shared ? !!saved.sharedProviders?.[p]?.configured : !value.providers[p].removeCredentials && (!!value.providers[p].apiKey || !!saved.providers[p]?.configured);
+  const modelFor = (p: Provider) => shared ? saved.sharedProviders?.[p]?.model ?? "" : value.providers[p].removeCredentials ? "" : value.providers[p].model;
+  const providerOrder = normalizeProviderOrder(shared ? saved.sharedProviderOrder : value.providerOrder);
+  const configured = providerOrder.filter((p) => hasKey(p) && !!modelFor(p));
   function change(patch: Partial<MixdiSettingsInput>) { setValue((v) => ({ ...v, ...patch })); setDirty(true); }
   function providerChange(p: Provider, patch: Partial<MixdiSettingsInput["providers"]["custom"]>) {
     change({ providers: { ...value.providers, [p]: { ...value.providers[p], ...patch } } });
@@ -85,19 +87,20 @@ function SettingsForm({ initial }: { initial: MixdiSettings }) {
       <div className="grid gap-3 sm:grid-cols-2">{(["shared", "dedicated"] as const).map((mode) => <label key={mode} className={cn("flex cursor-pointer gap-3 rounded-xl border p-4 transition-colors", value.providerMode === mode && "border-primary bg-primary/5")}><input type="radio" name="mixdi-provider-source" className="mt-1 accent-primary" disabled={locked} checked={value.providerMode === mode} onChange={() => { change({ providerMode: mode }); setResults({}); setTestError(""); }} /><div><span className="text-sm font-semibold">{mode === "shared" ? "Reuse existing providers" : "Dedicated Mixdi providers"}</span><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{mode === "shared" ? "Use the models configured for WhatsApp, with the same fallback order." : "Choose separate models and credentials just for Mixdi."}</p></div></label>)}</div>
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold">{shared ? "Shared models" : "Provider configuration"}</h3><p className="mt-1 text-xs text-muted-foreground">Providers run in the order below. Tests validate connectivity and Mixdi JSON output.</p></div><Button variant="outline" disabled={locked || !configured.length} onClick={() => test()}>{testing === "all" ? <Loader2 className="mr-2 size-4 animate-spin" /> : <FlaskConical className="mr-2 size-4" />}Test all configured</Button></div>
       <p className="rounded-lg bg-muted/50 px-4 py-3 text-xs leading-relaxed text-muted-foreground">Tests use a small synthetic prompt and may consume provider quota. Dedicated tests include your unsaved model edits; saved keys stay on the server. Testing never saves settings or creates tickets or documents.{shared && <> <Link className="text-primary underline" to={`/${org?.slug}/settings/integrations`}>Manage shared providers</Link>.</>}</p>
+      <ProviderFallbackOrder id="mixdi-default-provider" order={providerOrder} configured={configured} disabled={locked || shared} onChange={(providerOrder) => change({ providerOrder })} />
       {testError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{testError}</p>}
       {shared && !configured.length && <div className="rounded-xl border border-dashed p-8 text-center"><KeyRound className="mx-auto mb-3 size-6 text-muted-foreground" /><h4 className="text-sm font-medium">No shared providers configured</h4><p className="mt-2 text-sm text-muted-foreground">Configure a provider in WhatsApp settings or choose dedicated Mixdi providers above.</p></div>}
-      <div className="space-y-3">{AI_PROVIDERS.filter((p) => !shared || configured.includes(p)).map((p, index) => {
+      <div className="space-y-3">{providerOrder.filter((p) => !shared || configured.includes(p)).map((p, index) => {
         const result = results[p];
         const active = testing === "all" ? configured.includes(p) : testing === p;
-        return <details key={`${value.providerMode}:${p}`} open={shared || hasKey(p) || !!modelFor(p)} className="group overflow-hidden rounded-xl border bg-card">
+        return <details key={`${value.providerMode}:${p}`} open={shared || !!value.providers[p].removeCredentials || hasKey(p) || !!modelFor(p)} className="group overflow-hidden rounded-xl border bg-card">
           <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 sm:px-5"><span className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted/40 text-xs font-semibold text-muted-foreground">{index + 1}</span><div className="min-w-0 flex-1"><h4 className="text-sm font-semibold">{providerNames[p]}</h4><p className="mt-0.5 truncate text-xs text-muted-foreground">{modelFor(p) || "Add a model to get started"}</p></div><span className={cn("rounded-full px-2 py-1 text-[11px] font-medium", hasKey(p) ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>{hasKey(p) ? "Key configured" : "Not configured"}</span><ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" /></summary>
           <div className="space-y-4 border-t p-4 sm:p-5">
-            {shared ? <p className="text-sm text-muted-foreground">Uses the saved {providerNames[p]} configuration from WhatsApp.{p === "custom" && saved.sharedProviders?.[p]?.url && <span className="mt-1 block break-all font-mono text-xs">{saved.sharedProviders[p].url}</span>}</p> : <>
+            {shared ? <p className="text-sm text-muted-foreground">Uses the saved {providerNames[p]} configuration from WhatsApp.{p === "custom" && saved.sharedProviders?.[p]?.url && <span className="mt-1 block break-all font-mono text-xs">{saved.sharedProviders[p].url}</span>}</p> : value.providers[p].removeCredentials ? <div role="status" className="space-y-2"><p className="text-sm">Credentials, model{p === "custom" ? " and URL" : ""} will be removed when you save.</p><Button type="button" variant="outline" size="sm" disabled={locked} onClick={() => providerChange(p, { removeCredentials: false })}>Undo removal</Button></div> : <>
               <div className="grid gap-4 sm:grid-cols-2"><label className="text-xs font-medium" htmlFor={`mixdi-${p}-key`}>API key{saved.providers[p]?.configured && value.providers[p].apiKey === undefined && <span className="ml-2 font-normal text-emerald-600">Saved securely</span>}<Input id={`mixdi-${p}-key`} className="mt-1.5" type="password" autoComplete="new-password" disabled={locked} placeholder={saved.providers[p]?.configured ? "Leave blank to keep the saved key" : "Enter API key"} value={value.providers[p].apiKey ?? ""} onChange={(e) => providerChange(p, { apiKey: e.target.value || undefined })} /></label><ProviderModelSelect id={`mixdi-${p}-model`} provider={p} source="mixdi" apiKey={value.providers[p].apiKey} hasSavedKey={!!saved.providers[p]?.configured && value.providers[p].apiKey === undefined} value={value.providers[p].model} disabled={locked} onChange={(model) => providerChange(p, { model })} /></div>
               {p === "custom" && <label className="block text-xs font-medium" htmlFor="mixdi-custom-url">Chat completions URL<Input id="mixdi-custom-url" className="mt-1.5" disabled={locked} placeholder="https://provider.example/v1/chat/completions" value={value.providers.custom.url ?? ""} onChange={(e) => providerChange(p, { url: e.target.value })} /></label>}
             </>}
-            <div className="flex items-center justify-between gap-3"><Button variant="outline" size="sm" disabled={locked || !hasKey(p) || !modelFor(p)} onClick={() => test(p)}>{active ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : <FlaskConical className="mr-2 size-3.5" />}Test {providerNames[p]}</Button>{!shared && <button className="text-xs text-muted-foreground underline-offset-4 hover:text-destructive hover:underline" disabled={locked} onClick={() => providerChange(p, { model: "", apiKey: "", ...(p === "custom" ? { url: "" } : {}) })}>Clear configuration</button>}</div>
+            <div className="flex items-center justify-between gap-3"><Button variant="outline" size="sm" disabled={locked || !hasKey(p) || !modelFor(p)} onClick={() => test(p)}>{active ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : <FlaskConical className="mr-2 size-3.5" />}Test {providerNames[p]}</Button>{!shared && !value.providers[p].removeCredentials && (hasKey(p) || modelFor(p) || (p === "custom" && value.providers.custom.url)) && <Button type="button" variant="outline" size="sm" className="text-destructive" aria-label={`Remove ${providerNames[p]} credentials`} disabled={locked} onClick={() => providerChange(p, { removeCredentials: true })}>Remove credentials</Button>}</div>
             {result && <div role="status" className={cn("flex gap-2 rounded-lg border p-3", result.ok ? "border-emerald-500/20 bg-emerald-500/5" : "border-destructive/20 bg-destructive/5")}>{result.ok ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />}<div className="min-w-0"><p className="text-sm font-medium">{result.ok ? "Model ready" : "Test failed"}<span className="ml-2 text-xs font-normal text-muted-foreground">{result.durationMs.toLocaleString()} ms{result.status ? ` · HTTP ${result.status}` : ""}</span></p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{result.message}</p></div></div>}
           </div>
         </details>;

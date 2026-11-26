@@ -223,6 +223,53 @@ describe("saved Mixdi conversations", () => {
 });
 
 describe("Mixdi model tests", () => {
+  it("uses saved dedicated and shared fallback orders for chat", async () => {
+    const { DB } = await import("../src/core/database/database");
+    const { whatsappConnections } = await import("../src/core/database/schema");
+    const { eq } = await import("drizzle-orm");
+    const db = ctx.moduleRef.get(DB);
+    const before = (await owner.api(org).get("/api/mixdi/settings")).body;
+    const organization = (await owner.api(org).get("/api/org")).body;
+    const [connection] = await db.select().from(whatsappConnections).where(eq(whatsappConnections.orgId, organization.id));
+    const mock = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => String(url).includes("custom.test")
+      ? new Response("", { status: 503 }) : Response.json({ choices: [{ message: { content: '{"message":"Ready","draft":null}' } }] }));
+    try {
+      await owner.api(org).put("/api/mixdi/settings").send({ ...settings, providerOrder: ["custom", "openai"], providers: { ...settings.providers, custom: { model: "custom-model", apiKey: "custom-key", url: "https://custom.test/chat" } } }).expect(200);
+      await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201);
+      expect(mock.mock.calls.map(([url]) => String(url))).toEqual(["https://custom.test/chat", "https://api.openai.com/v1/chat/completions"]);
+      mock.mockClear();
+      await db.update(whatsappConnections).set({ providerOrder: ["openai", "ollama"] }).where(eq(whatsappConnections.orgId, organization.id));
+      const shared = (await owner.api(org).put("/api/mixdi/settings").send({ ...settings, providerMode: "shared", providers: { ...settings.providers, custom: { removeCredentials: true } } }).expect(200)).body;
+      expect(shared.sharedProviderOrder.slice(0, 2)).toEqual(["openai", "ollama"]);
+      await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201);
+      expect(mock.mock.calls).toHaveLength(1);
+      expect(mock.mock.calls[0][1]?.headers).toMatchObject({ authorization: "Bearer shared-key" });
+    } finally {
+      await owner.api(org).put("/api/mixdi/settings").send({ ...before, providers: { ...before.providers, custom: { removeCredentials: true } } }).expect(200);
+      await db.update(whatsappConnections).set({ providerOrder: connection.providerOrder }).where(eq(whatsappConnections.orgId, organization.id));
+    }
+  });
+
+  it("removes custom credentials, keeps other saved keys and persists dedicated provider order", async () => {
+    const before = (await owner.api(org).get("/api/mixdi/settings")).body;
+    const input = { ...before, providerOrder: ["custom", "openai"], providers: { ...before.providers, custom: { model: "custom-model", apiKey: "custom-key", url: "https://custom.test/chat" } } };
+    const mock = vi.spyOn(globalThis, "fetch");
+    try {
+      const setup = (await owner.api(org).put("/api/mixdi/settings").send(input).expect(200)).body;
+      expect(setup.providerOrder.slice(0, 2)).toEqual(["custom", "openai"]);
+      const remove = { ...setup, providers: { ...setup.providers, openai: { model: "test-model", apiKey: "" }, custom: { removeCredentials: true, url: "not-a-url" } } };
+      await member.api(org).put("/api/mixdi/settings").send(remove).expect(403);
+      const result = (await owner.api(org).put("/api/mixdi/settings").send(remove).expect(200)).body;
+      expect(result.providers.custom).toEqual({ model: "", configured: false, url: "" });
+      expect(result.providers.openai.configured).toBe(true);
+      expect(result.userIds).toEqual(before.userIds);
+      expect((await owner.api(org).get("/api/mixdi/settings")).body).toEqual(result);
+      const tested = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", provider: "custom" }).expect(201)).body;
+      expect(tested[0].category).toBe("configuration");
+      expect(mock).not.toHaveBeenCalled();
+      await owner.api(org).put("/api/mixdi/settings").send({ ...remove, providerOrder: ["openai", "openai"] }).expect(400);
+    } finally { await owner.api(org).put("/api/mixdi/settings").send({ ...before, providers: { ...before.providers, custom: { removeCredentials: true } } }).expect(200); }
+  });
   it("discovers models with organization-scoped saved and unsaved keys without persisting changes", async () => {
     const mock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ data: [{ id: "gpt-test" }] }));
     const before = (await owner.api(org).get("/api/mixdi/settings").expect(200)).body;
@@ -290,7 +337,7 @@ describe("Mixdi model tests", () => {
     const result = (await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", provider: "custom" }).expect(201)).body;
     expect(result[0]).toMatchObject({ ok: false, category: "configuration" });
     expect(mock).not.toHaveBeenCalled();
-    const empty = Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: "", apiKey: "" }]));
+    const empty = Object.fromEntries(AI_PROVIDERS.map((p) => [p, { removeCredentials: true }]));
     await owner.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", providers: empty }).expect(400);
   });
 });

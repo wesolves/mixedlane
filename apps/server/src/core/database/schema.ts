@@ -546,6 +546,7 @@ export const whatsappConnections = pgTable("whatsapp_connections", {
   webhookSecret: text("webhook_secret").notNull(),
   defaultProjectId: uuid("default_project_id").references(() => projects.id, { onDelete: "set null" }),
   askProjectEveryTime: boolean("ask_project_every_time").notNull().default(true),
+  providerOrder: jsonb("provider_order").notNull().default([]).$type<import("@mixedlane/shared").AiProvider[]>(),
 });
 export const whatsappSessions = pgTable("whatsapp_sessions", {
   id: uuid("id").primaryKey(), orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),

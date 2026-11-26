@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
-import { AI_PROVIDERS, type AiModelListInput, type ItemCreate, type WhatsappSettingsInput, type WhatsappSettingsInfo } from "@mixedlane/shared";
+import { AI_PROVIDERS, normalizeProviderOrder, type AiModelListInput, type ItemCreate, type WhatsappSettingsInput, type WhatsappSettingsInfo } from "@mixedlane/shared";
 import { DB, type Db } from "../../core/database/database";
 import { whatsappConnections as connections, whatsappSessions as sessions, whatsappContacts as contacts, whatsappDrafts as drafts, whatsappEvents as events, projects, workItems } from "../../core/database/schema";
 import type { RequestContext } from "../../core/context";
@@ -19,6 +19,7 @@ import { TriageFailure } from "./ai-diagnostics";
 import { whatsappBootstrap } from "./bootstrap";
 import { ticketText } from "./ticket-context";
 import { listProviderModels } from "../ai/models";
+import { resolveProviderConfig } from "../ai/provider-config";
 
 type Draft = typeof drafts.$inferSelect;
 const scope = (orgId: string, id: string) => and(eq(drafts.orgId, orgId), eq(drafts.id, id));
@@ -45,7 +46,7 @@ export class WhatsappService {
     const [row] = await this.db.select().from(connections).where(eq(connections.orgId, orgId));
     const bootstrap = row ? null : whatsappBootstrap();
     const providers: ProviderConfig | null = row ? JSON.parse(decrypt(row.providersEnc)) : bootstrap?.providers ?? null;
-    return { configured: !!row, baseUrl: row?.baseUrl ?? bootstrap?.baseUrl ?? "http://192.168.0.6:2785", callbackUrl: row?.callbackUrl ?? config().PUBLIC_URL ?? config().APP_URL,
+    return { providerOrder: normalizeProviderOrder(row?.providerOrder), configured: !!row, baseUrl: row?.baseUrl ?? bootstrap?.baseUrl ?? "http://192.168.0.6:2785", callbackUrl: row?.callbackUrl ?? config().PUBLIC_URL ?? config().APP_URL,
       defaultProjectId: row?.defaultProjectId ?? null, askProjectEveryTime: row?.askProjectEveryTime ?? true,
       hasApiKey: !!row || !!bootstrap?.apiKey, providers: Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: providers?.[p]?.model ?? "", configured: !!providers?.[p]?.apiKey, ...(p === "custom" ? { url: providers?.[p]?.url ?? "" } : {}) }])) as WhatsappSettingsInfo["providers"] };
   }
@@ -76,10 +77,10 @@ export class WhatsappService {
     if (!old || old.baseUrl !== input.baseUrl.replace(/\/$/, "") || apiKey !== decrypt(old.apiKeyEnc)) {
       await new OpenWaClient(input.baseUrl, apiKey).call("/sessions");
     }
-    const providers = Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: input.providers[p].model, apiKey: input.providers[p].apiKey || previous?.[p]?.apiKey || "", ...(p === "custom" ? { url: input.providers.custom.url ?? previous?.custom?.url ?? "" } : {}) }]));
-    for (const p of AI_PROVIDERS) if (providers[p].apiKey && !providers[p].model) throw new AppError(400, `Choose a model for ${p}`);
-    if (providers.custom.apiKey && !providers.custom.url) throw new AppError(400, "Enter a chat completions URL for the custom provider");
-    const values = { defaultProjectId: input.defaultProjectId, askProjectEveryTime: input.askProjectEveryTime, baseUrl: input.baseUrl.replace(/\/$/, ""), callbackUrl: input.callbackUrl.replace(/\/$/, ""), apiKeyEnc: encrypt(apiKey), providersEnc: encrypt(JSON.stringify(providers)), webhookSecret: old?.webhookSecret ?? randomSecret() };
+    const providers = resolveProviderConfig(input.providers, previous ?? {});
+    for (const p of AI_PROVIDERS) if (providers[p]?.apiKey && !providers[p]?.model) throw new AppError(400, `Choose a model for ${p}`);
+    if (providers.custom?.apiKey && !providers.custom.url) throw new AppError(400, "Enter a chat completions URL for the custom provider");
+    const values = { providerOrder: normalizeProviderOrder(input.providerOrder ?? old?.providerOrder), defaultProjectId: input.defaultProjectId, askProjectEveryTime: input.askProjectEveryTime, baseUrl: input.baseUrl.replace(/\/$/, ""), callbackUrl: input.callbackUrl.replace(/\/$/, ""), apiKeyEnc: encrypt(apiKey), providersEnc: encrypt(JSON.stringify(providers)), webhookSecret: old?.webhookSecret ?? randomSecret() };
     await this.db.insert(connections).values({ orgId: ctx.orgId, ...values }).onConflictDoUpdate({ target: connections.orgId, set: values });
     return this.settings(ctx.orgId);
   }
@@ -408,7 +409,7 @@ export class WhatsappService {
       const conn = await this.connection(ctx.orgId);
       const { proposal } = await triage({ report: command[2].trim(), project, items: [], updateTicket: {
         key: previous.key, title: previous.title, description: context.description, priority: previous.priority, type: previous.type, parentId: previous.parentId,
-      } }, JSON.parse(decrypt(conn.providersEnc)), { orgId: ctx.orgId });
+      } }, JSON.parse(decrypt(conn.providersEnc)), { orgId: ctx.orgId, providerOrder: conn.providerOrder });
       // Permission may have changed during the provider call.
       const currentCtx = await this.sender(ctx.orgId, m.chatId);
       if (!currentCtx || currentCtx.userId !== ctx.userId) throw new AppError(403, "Your WhatsApp number is no longer linked to this member.");
@@ -447,7 +448,7 @@ export class WhatsappService {
       const { project } = await this.access.project(ctx, d.projectId, "item.create");
       const existing = await this.db.select({ id: workItems.id, key: workItems.key, title: workItems.title, type: workItems.type, parentId: workItems.parentId }).from(workItems).where(and(eq(workItems.orgId, orgId), eq(workItems.projectId, project.id))).orderBy(desc(workItems.updatedAt)).limit(200);
       const conn = await this.connection(orgId);
-      const { proposal, provider } = await triage({ report: d.report, project, items: existing }, JSON.parse(decrypt(conn.providersEnc)), { orgId, draftId: id });
+      const { proposal, provider } = await triage({ report: d.report, project, items: existing }, JSON.parse(decrypt(conn.providersEnc)), { orgId, draftId: id, providerOrder: conn.providerOrder });
       await this.db.update(drafts).set({ proposal, provider, status: "review", error: null }).where(and(scope(orgId, id), eq(drafts.status, "generating")));
     } catch (error) {
       await this.db.update(drafts).set({ status: "failed", error: error instanceof TriageFailure ? error.message : "Could not generate a valid draft. Check sender project access and integration configuration, then retry." }).where(and(scope(orgId, id), eq(drafts.status, "generating")));

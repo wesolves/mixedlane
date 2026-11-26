@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MessageCircle, Plus, QrCode, RefreshCw, Trash2 } from "lucide-react";
-import { AI_PROVIDERS, type WhatsappSettingsInput, type WhatsappSettingsInfo } from "@mixedlane/shared";
+import { AI_PROVIDERS, normalizeProviderOrder, type WhatsappSettingsInput, type WhatsappSettingsInfo } from "@mixedlane/shared";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useOrg } from "@/lib/auth";
@@ -11,8 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ProviderModelSelect } from "@/components/ProviderModelSelect";
+import { ProviderFallbackOrder } from "@/components/ProviderFallbackOrder";
 
-const names = { ollama: "Ollama Cloud · Primary", gemini: "Gemini · First fallback", grok: "Grok (xAI) · Second fallback", openai: "OpenAI", anthropic: "Anthropic · Claude", custom: "Custom provider" };
+const names = { ollama: "Ollama Cloud", gemini: "Google Gemini", grok: "Grok · xAI", openai: "OpenAI", anthropic: "Anthropic · Claude", custom: "Custom provider" };
 
 export function WhatsappIntegration() {
   const { org, can } = useOrg();
@@ -39,7 +40,7 @@ export function WhatsappIntegration() {
     <div className="space-y-7 p-5">
       {manage && settings.isLoading && <p className="text-sm text-muted-foreground">Loading WhatsApp settings…</p>}
       {settings.error && <p role="alert" className="text-sm text-destructive">{settings.error.message}</p>}
-      {manage && settings.data && <ConnectionForm key={org?.id} info={settings.data} onSave={(input) => action.mutateAsync(() => api.whatsapp.save(input))} pending={action.isPending} />}
+      {manage && settings.data && <ConnectionForm key={org?.id} info={settings.data} onSave={async (input) => await action.mutateAsync(() => api.whatsapp.save(input)) as WhatsappSettingsInfo} pending={action.isPending} />}
       {manage && settings.data?.configured && <>
         <div className="space-y-3 border-t pt-5"><h3 className="text-sm font-semibold">Connected accounts</h3><p className="text-xs text-muted-foreground">Owners and admins scan the QR here. Each connected number receives direct-message reports.</p>
           {available.data?.map((a) => <div key={a.id} className="flex items-center justify-between rounded-lg bg-muted/40 p-3 text-sm"><span>{a.name} · {a.phone || a.status}</span><Button size="sm" variant="outline" disabled={action.isPending} onClick={() => action.mutate(() => api.whatsapp.linkSession(a.id))}>Link existing account</Button></div>)}
@@ -72,7 +73,9 @@ export function WhatsappIntegration() {
   </section>;
 }
 
-function ConnectionForm({ info, onSave, pending }: { info: WhatsappSettingsInfo; onSave: (input: WhatsappSettingsInput) => Promise<unknown>; pending: boolean }) {
+function ConnectionForm({ info, onSave, pending }: { info: WhatsappSettingsInfo; onSave: (input: WhatsappSettingsInput) => Promise<WhatsappSettingsInfo>; pending: boolean }) {
+  const [saved, setSaved] = useState(info);
+  const [providerOrder, setProviderOrder] = useState(() => normalizeProviderOrder(info.providerOrder));
   const [baseUrl, setBaseUrl] = useState(info.baseUrl);
   const [callbackUrl, setCallbackUrl] = useState(info.callbackUrl);
   const [apiKey, setApiKey] = useState("");
@@ -80,8 +83,9 @@ function ConnectionForm({ info, onSave, pending }: { info: WhatsappSettingsInfo;
   const [defaultProjectId, setDefaultProjectId] = useState(info.defaultProjectId ?? "");
   const [askProjectEveryTime, setAskProjectEveryTime] = useState(info.askProjectEveryTime);
   const [customUrl, setCustomUrl] = useState(info.providers.custom.url ?? "");
-  const [providers, setProviders] = useState(() => Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: info.providers[p]?.model ?? "", apiKey: "" }])) as Record<typeof AI_PROVIDERS[number], { model: string; apiKey: string }>);
-  return <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); const input = { baseUrl, callbackUrl, defaultProjectId: defaultProjectId || null, askProjectEveryTime, ...(apiKey ? { apiKey } : {}), providers: Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: providers[p].model, ...(p === "custom" ? { url: customUrl } : {}), ...(providers[p].apiKey ? { apiKey: providers[p].apiKey } : {}) }])) } as WhatsappSettingsInput; onSave(input).then(() => { setApiKey(""); setProviders((prev) => Object.fromEntries(AI_PROVIDERS.map((p) => [p, { ...prev[p], apiKey: "" }])) as typeof providers); toast.success("WhatsApp settings saved"); }).catch(() => {}); }}>
+  const [providers, setProviders] = useState(() => Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: info.providers[p]?.model ?? "", apiKey: "", removeCredentials: false }])) as Record<typeof AI_PROVIDERS[number], { model: string; apiKey: string; removeCredentials: boolean }>);
+  const configured = providerOrder.filter((p) => !providers[p].removeCredentials && !!(providers[p].apiKey || saved.providers[p]?.configured) && !!providers[p].model);
+  return <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); const input = { providerOrder, baseUrl, callbackUrl, defaultProjectId: defaultProjectId || null, askProjectEveryTime, ...(apiKey ? { apiKey } : {}), providers: Object.fromEntries(AI_PROVIDERS.map((p) => [p, providers[p].removeCredentials ? { model: "", removeCredentials: true, ...(p === "custom" ? { url: "" } : {}) } : { model: providers[p].model, ...(p === "custom" ? { url: customUrl } : {}), ...(providers[p].apiKey ? { apiKey: providers[p].apiKey } : {}) }])) } as WhatsappSettingsInput; onSave(input).then((updated) => { setSaved(updated); setApiKey(""); setProviderOrder(normalizeProviderOrder(updated.providerOrder)); setCustomUrl(updated.providers.custom.url ?? ""); setProviders(Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: updated.providers[p]?.model ?? "", apiKey: "", removeCredentials: false }])) as typeof providers); toast.success("WhatsApp settings saved"); }).catch(() => {}); }}>
     <div className="grid gap-4 md:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="wa-url">OpenWA URL</Label><Input id="wa-url" type="url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} required /></div><div className="space-y-1.5"><Label htmlFor="wa-key">OpenWA API key</Label><Input id="wa-key" type="password" autoComplete="new-password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={info.hasApiKey ? "Saved — leave blank to keep" : "Enter gateway API key"} required={!info.hasApiKey} /></div></div>
     <div className="space-y-1.5"><Label htmlFor="wa-callback">Mixedlane URL reachable from OpenWA</Label><Input id="wa-callback" type="url" value={callbackUrl} onChange={(e) => setCallbackUrl(e.target.value)} required /><p className="text-xs text-muted-foreground">Use this app’s LAN or public base URL. OpenWA delivers signed message events here.</p></div>
     <div className="space-y-3"><h3 className="text-sm font-semibold">Project selection</h3>
@@ -92,11 +96,15 @@ function ConnectionForm({ info, onSave, pending }: { info: WhatsappSettingsInfo;
     </div>
     <div className="space-y-3"><h3 className="text-sm font-semibold">AI providers</h3><p className="text-xs text-muted-foreground">Tried in this order. Missing providers are skipped; errors and invalid ticket proposals move to the next provider. Use a model available in your provider account. Keys are encrypted on the server.</p>
       <p className="text-xs text-muted-foreground">Failed drafts show a diagnostic reference. Administrators can search server logs for that reference under AIIntegration to inspect provider attempts and fallback outcomes.</p>
-      {AI_PROVIDERS.map((p) => <div key={p} className="grid gap-3 rounded-lg bg-muted/35 p-3 md:grid-cols-[180px_1fr_1fr]">
+      <ProviderFallbackOrder id="wa-default-provider" order={providerOrder} configured={configured} disabled={pending} onChange={setProviderOrder} />
+      {providerOrder.map((p) => <div key={p} className="grid gap-3 rounded-lg bg-muted/35 p-3 md:grid-cols-[180px_1fr_1fr]">
         <p className="self-center text-sm font-medium">{names[p]}</p>
-        <div className="space-y-1.5"><Label htmlFor={`wa-${p}-key`}>API key</Label><Input id={`wa-${p}-key`} aria-label={`${p} API key`} type="password" autoComplete="new-password" disabled={pending} placeholder={info.providers[p]?.configured ? "Saved — leave blank to keep" : "API key"} value={providers[p].apiKey} onChange={(e) => setProviders({ ...providers, [p]: { ...providers[p], apiKey: e.target.value } })} /></div>
-        <ProviderModelSelect id={`wa-${p}-model`} provider={p} value={providers[p].model} apiKey={providers[p].apiKey} hasSavedKey={!!info.providers[p]?.configured} source="whatsapp" disabled={pending} onChange={(model) => setProviders((previous) => ({ ...previous, [p]: { ...previous[p], model } }))} />
+        {providers[p].removeCredentials ? <div role="status" className="space-y-2 md:col-span-2"><p className="text-sm">Credentials, model{p === "custom" ? " and URL" : ""} will be removed when you save.</p><Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setProviders((previous) => ({ ...previous, [p]: { ...previous[p], removeCredentials: false } }))}>Undo removal</Button></div> : <>
+        <div className="space-y-1.5"><Label htmlFor={`wa-${p}-key`}>API key</Label><Input id={`wa-${p}-key`} aria-label={`${p} API key`} type="password" autoComplete="new-password" disabled={pending} placeholder={saved.providers[p]?.configured ? "Saved — leave blank to keep" : "API key"} value={providers[p].apiKey} onChange={(e) => setProviders({ ...providers, [p]: { ...providers[p], apiKey: e.target.value } })} /></div>
+        <ProviderModelSelect id={`wa-${p}-model`} provider={p} value={providers[p].model} apiKey={providers[p].apiKey} hasSavedKey={!!saved.providers[p]?.configured} source="whatsapp" disabled={pending} onChange={(model) => setProviders((previous) => ({ ...previous, [p]: { ...previous[p], model } }))} />
         {p === "custom" && <div className="space-y-1.5 md:col-span-3"><Label htmlFor="wa-custom-url">Chat completions URL</Label><Input id="wa-custom-url" type="url" placeholder="https://provider.example/v1/chat/completions" value={customUrl} onChange={(e) => setCustomUrl(e.target.value)} /><p className="text-xs text-muted-foreground">Use the full OpenAI-compatible chat completions endpoint.</p></div>}
+        {(saved.providers[p]?.configured || providers[p].apiKey || providers[p].model || (p === "custom" && customUrl)) && <div className="md:col-span-3"><Button type="button" variant="outline" size="sm" className="text-destructive" aria-label={`Remove ${names[p]} credentials`} disabled={pending} onClick={() => setProviders((previous) => ({ ...previous, [p]: { ...previous[p], removeCredentials: true } }))}>Remove credentials</Button></div>}
+        </>}
       </div>)}
     </div><Button disabled={pending}>{pending ? "Saving…" : "Save connection settings"}</Button>
   </form>;

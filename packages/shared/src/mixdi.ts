@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ITEM_TYPES, PRIORITIES } from "./hierarchy";
-import { AI_PROVIDERS, aiModelListSchema, whatsappSettingsSchema } from "./whatsapp";
+import { AI_PROVIDERS, aiModelListSchema, providerOrderSchema, whatsappSettingsSchema, type AiProvider } from "./whatsapp";
 
 export const mixdiModelListSchema = aiModelListSchema.extend({ providerMode: z.enum(["shared", "dedicated"]) });
 export type MixdiModelListInput = z.infer<typeof mixdiModelListSchema>;
@@ -8,6 +8,7 @@ export type MixdiModelListInput = z.infer<typeof mixdiModelListSchema>;
 export const mixdiSettingsSchema = z.object({
   enabled: z.boolean(),
   providerMode: z.enum(["shared", "dedicated"]),
+  providerOrder: providerOrderSchema.optional(),
   providers: whatsappSettingsSchema.shape.providers,
   userIds: z.array(z.string().uuid()).max(1000),
   createTickets: z.boolean(),
@@ -16,7 +17,9 @@ export const mixdiSettingsSchema = z.object({
   spaceIds: z.array(z.string().uuid()).max(1000),
 });
 export type MixdiSettingsInput = z.infer<typeof mixdiSettingsSchema>;
-export type MixdiSettings = Omit<MixdiSettingsInput, "providers"> & {
+export type MixdiSettings = Omit<MixdiSettingsInput, "providers" | "providerOrder"> & {
+  providerOrder: AiProvider[];
+  sharedProviderOrder: AiProvider[];
   providers: Record<string, { model: string; configured: boolean; url?: string }>;
   sharedProviders: Record<string, { model: string; configured: boolean; url?: string }>;
 };
