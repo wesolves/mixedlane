@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ProviderModelSelect } from "@/components/ProviderModelSelect";
 import { ProviderFallbackOrder } from "@/components/ProviderFallbackOrder";
+import { MixdiProviderSourceNotice } from "@/components/MixdiProviderSourceNotice";
 
 const names = { ollama: "Ollama Cloud", gemini: "Google Gemini", grok: "Grok · xAI", openai: "OpenAI", anthropic: "Anthropic · Claude", custom: "Custom provider" };
 
@@ -34,12 +35,13 @@ export function WhatsappIntegration() {
   const [removeId, setRemoveId] = useState<string | null>(null);
   const qr = useQuery({ queryKey: [...key, "qr", qrSession], queryFn: () => api.whatsapp.qr(qrSession!), enabled: !!qrSession, refetchInterval: 4000, retry: false });
   useEffect(() => { if (accounts.data?.find((a) => a.id === qrSession)?.status === "ready") { setQrSession(null); toast.success("WhatsApp connected"); } }, [accounts.data, qrSession]);
-  const action = useMutation({ mutationFn: (fn: () => Promise<unknown>) => fn(), onSuccess: () => { void qc.invalidateQueries({ queryKey: key }); }, onError: (e: Error) => toast.error(e.message) });
+  const action = useMutation({ mutationFn: (fn: () => Promise<unknown>) => fn(), onSuccess: () => { void qc.invalidateQueries({ queryKey: key }); void qc.invalidateQueries({ queryKey: ["mixdi-settings", org?.id] }); }, onError: (e: Error) => toast.error(e.message) });
   return <section className="overflow-hidden rounded-xl border bg-card">
     <div className="flex items-center gap-3 border-b px-5 py-4"><MessageCircle className="size-7 text-emerald-600" /><div><h2 className="font-semibold">WhatsApp</h2><p className="text-sm text-muted-foreground">Turn team messages into reviewed tickets with AI.</p></div></div>
     <div className="space-y-7 p-5">
       {manage && settings.isLoading && <p className="text-sm text-muted-foreground">Loading WhatsApp settings…</p>}
       {settings.error && <p role="alert" className="text-sm text-destructive">{settings.error.message}</p>}
+      {manage && <MixdiProviderSourceNotice allowSwitch />}
       {manage && settings.data && <ConnectionForm key={org?.id} info={settings.data} onSave={async (input) => await action.mutateAsync(() => api.whatsapp.save(input)) as WhatsappSettingsInfo} pending={action.isPending} />}
       {manage && settings.data?.configured && <>
         <div className="space-y-3 border-t pt-5"><h3 className="text-sm font-semibold">Connected accounts</h3><p className="text-xs text-muted-foreground">Owners and admins scan the QR here. Each connected number receives direct-message reports.</p>

@@ -258,6 +258,55 @@ describe("saved Mixdi conversations", () => {
 });
 
 describe("Mixdi model tests", () => {
+  it("applies saved integration OpenAI to actual chat without overwriting dedicated credentials or access", async () => {
+    const { DB } = await import("../src/core/database/database");
+    const { mixdiSettings, whatsappConnections } = await import("../src/core/database/schema");
+    const { encrypt } = await import("../src/modules/github/crypto");
+    const { eq } = await import("drizzle-orm");
+    const db = ctx.moduleRef.get(DB);
+    const organization = (await owner.api(org).get("/api/org")).body;
+    const [originalMixdi] = await db.select().from(mixdiSettings).where(eq(mixdiSettings.orgId, organization.id));
+    const [originalShared] = await db.select().from(whatsappConnections).where(eq(whatsappConnections.orgId, organization.id));
+    const mock = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => String(url).includes("ollama.com")
+      ? Response.json({ error: "Payment required" }, { status: 402 }) : Response.json({ choices: [{ message: { content: '{"message":"OpenAI is active","draft":null}' } }] }));
+    try {
+      const providers = Object.fromEntries(AI_PROVIDERS.map((p) => [p, p === "ollama" ? { model: "beam:cloud", apiKey: "dedicated-ollama-key" } : { removeCredentials: true }]));
+      await owner.api(org).put("/api/mixdi/settings").send({ ...settings, providers, providerOrder: ["ollama"] }).expect(200);
+      const [dedicated] = await db.select().from(mixdiSettings).where(eq(mixdiSettings.orgId, organization.id));
+      await db.update(whatsappConnections).set({ providersEnc: encrypt("{}") }).where(eq(whatsappConnections.orgId, organization.id));
+      await owner.api(org).put("/api/mixdi/settings/provider-source").send({ providerMode: "shared" }).expect(400);
+      expect((await owner.api(org).get("/api/mixdi/settings")).body.providerMode).toBe("dedicated");
+      await db.update(whatsappConnections).set({ providersEnc: encrypt(JSON.stringify({ openai: { model: "gpt-6-luna", apiKey: "integration-openai-key" } })), providerOrder: ["openai"] }).where(eq(whatsappConnections.orgId, organization.id));
+      const integration = (await owner.api(org).get("/api/whatsapp/settings")).body;
+      expect(integration.providers.openai).toMatchObject({ configured: true, model: "gpt-6-luna" });
+      expect(integration.providers.ollama.configured).toBe(false);
+      await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(502);
+      expect(mock.mock.calls.map(([url]) => String(url))).toEqual(["https://ollama.com/api/chat"]);
+      mock.mockClear();
+      await member.api(org).put("/api/mixdi/settings/provider-source").send({ providerMode: "shared" }).expect(403);
+      const foreign = await signUp(ctx);
+      await foreign.user.api(foreign.org).put("/api/mixdi/settings/provider-source").send({ providerMode: "shared", orgId: organization.id }).expect(400);
+      expect((await owner.api(org).get("/api/mixdi/settings")).body.providerMode).toBe("dedicated");
+      await owner.api(org).put("/api/mixdi/settings/provider-source").send({ providerMode: "invalid" }).expect(400);
+      const switched = (await owner.api(org).put("/api/mixdi/settings/provider-source").send({ providerMode: "shared", userIds: [], enabled: false }).expect(200)).body;
+      expect(switched.providerMode).toBe("shared");
+      expect(switched.sharedProviders.openai).toMatchObject({ model: "gpt-6-luna", configured: true });
+      const [after] = await db.select().from(mixdiSettings).where(eq(mixdiSettings.orgId, organization.id));
+      expect(after.providersEnc).toBe(dedicated.providersEnc);
+      expect(after.settings).toEqual({ ...dedicated.settings, providerMode: "shared" });
+      expect(mock).not.toHaveBeenCalled();
+      const chat = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+      expect(chat.message).toBe("OpenAI is active");
+      expect(mock.mock.calls).toHaveLength(1);
+      expect(mock.mock.calls[0][0]).toBe("https://api.openai.com/v1/chat/completions");
+      expect(mock.mock.calls[0][1]?.headers).toMatchObject({ authorization: "Bearer integration-openai-key" });
+      expect(JSON.parse(String(mock.mock.calls[0][1]?.body)).model).toBe("gpt-6-luna");
+    } finally {
+      await db.update(mixdiSettings).set({ settings: originalMixdi.settings, providersEnc: originalMixdi.providersEnc }).where(eq(mixdiSettings.orgId, organization.id));
+      await db.update(whatsappConnections).set({ providersEnc: originalShared.providersEnc, providerOrder: originalShared.providerOrder }).where(eq(whatsappConnections.orgId, organization.id));
+    }
+  });
+
   it("uses saved dedicated and shared fallback orders for chat", async () => {
     const { DB } = await import("../src/core/database/database");
     const { whatsappConnections } = await import("../src/core/database/schema");

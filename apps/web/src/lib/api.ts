@@ -90,6 +90,7 @@ export type ProjectWithAccess = Project & { access: ProjectAccessInfo };
 
 export const api = {
   mixdi: {
+    setProviderSource: (input: import("@mixedlane/shared").MixdiProviderSourceInput) => request<import("@mixedlane/shared").MixdiSettings>("/mixdi/settings/provider-source", json("PUT", input)),
     models: (input: import("@mixedlane/shared").MixdiModelListInput, signal?: AbortSignal) => request<import("@mixedlane/shared").AiModelOption[]>("/mixdi/settings/models", { ...json("POST", input), signal }),
     testModels: (input: import("@mixedlane/shared").MixdiModelTestInput) => request<import("@mixedlane/shared").MixdiModelTestResult[]>("/mixdi/settings/test", json("POST", input)),
     history: () => request<import("@mixedlane/shared").MixdiConversationSummary[]>("/mixdi/conversations"),
