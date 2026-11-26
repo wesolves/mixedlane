@@ -78,7 +78,9 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
   }
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Request failed (${res.status})`);
+  if (!res.ok) throw new ApiError(res.status, data?.error ?? ([502, 503, 504].includes(res.status)
+    ? `The API or its upstream service is unavailable (${res.status}). Retry shortly; if this continues, check the API and reverse-proxy logs.`
+    : `Request failed (${res.status})`));
   return data as T;
 }
 
@@ -88,6 +90,7 @@ export type ProjectWithAccess = Project & { access: ProjectAccessInfo };
 
 export const api = {
   mixdi: {
+    models: (input: import("@mixedlane/shared").MixdiModelListInput, signal?: AbortSignal) => request<import("@mixedlane/shared").AiModelOption[]>("/mixdi/settings/models", { ...json("POST", input), signal }),
     testModels: (input: import("@mixedlane/shared").MixdiModelTestInput) => request<import("@mixedlane/shared").MixdiModelTestResult[]>("/mixdi/settings/test", json("POST", input)),
     history: () => request<import("@mixedlane/shared").MixdiConversationSummary[]>("/mixdi/conversations"),
     conversation: (id: string) => request<import("@mixedlane/shared").MixdiConversation>(`/mixdi/conversations/${id}`),
@@ -99,6 +102,7 @@ export const api = {
     create: (id: string) => request<import("@mixedlane/shared").MixdiResult>(`/mixdi/drafts/${id}/create`, json("POST", {})),
   },
   whatsapp: {
+    models: (input: import("@mixedlane/shared").AiModelListInput, signal?: AbortSignal) => request<import("@mixedlane/shared").AiModelOption[]>("/whatsapp/settings/models", { ...json("POST", input), signal }),
     settings: () => request<import("@mixedlane/shared").WhatsappSettingsInfo>("/whatsapp/settings"),
     save: (input: import("@mixedlane/shared").WhatsappSettingsInput) => request<import("@mixedlane/shared").WhatsappSettingsInfo>("/whatsapp/settings", json("PUT", input)),
     sessions: () => request<import("@mixedlane/shared").WhatsappSession[]>("/whatsapp/sessions"),

@@ -1,6 +1,6 @@
-import { Controller, Delete, Get, Module, Param, ParseUUIDPipe, Post, Put } from "@nestjs/common";
+import { Controller, Delete, Get, Header, HttpCode, Module, Param, ParseUUIDPipe, Post, Put } from "@nestjs/common";
 import { ApiBearerAuth, ApiHeader, ApiTags } from "@nestjs/swagger";
-import { mixdiChatSchema, mixdiSettingsSchema, mixdiModelTestSchema, type MixdiChat, type MixdiSettingsInput, type MixdiModelTestInput } from "@mixedlane/shared";
+import { mixdiChatSchema, mixdiSettingsSchema, mixdiModelListSchema, mixdiModelTestSchema, type MixdiChat, type MixdiSettingsInput, type MixdiModelListInput, type MixdiModelTestInput } from "@mixedlane/shared";
 import { Ctx, type RequestContext } from "../../core/context";
 import { ZBody } from "../../core/zod-body";
 import { WorkModule } from "../work/work.module";
@@ -16,6 +16,10 @@ export class MixdiController {
   @Get("settings") settings(@Ctx() ctx: RequestContext) { return this.mixdi.settings(ctx); }
   @Put("settings") save(@Ctx() ctx: RequestContext, @ZBody(mixdiSettingsSchema) body: MixdiSettingsInput) { return this.mixdi.save(ctx, body); }
   @Post("settings/test") testModels(@Ctx() ctx: RequestContext, @ZBody(mixdiModelTestSchema) body: MixdiModelTestInput) { return this.mixdi.testModels(ctx, body); }
+  @Post("settings/models")
+  @HttpCode(200)
+  @Header("Cache-Control", "no-store")
+  models(@Ctx() ctx: RequestContext, @ZBody(mixdiModelListSchema) body: MixdiModelListInput) { return this.mixdi.models(ctx, body); }
   @Get("access") access(@Ctx() ctx: RequestContext) { return this.mixdi.availability(ctx); }
   @Post("chat") chat(@Ctx() ctx: RequestContext, @ZBody(mixdiChatSchema) body: MixdiChat) { return this.mixdi.chat(ctx, body); }
   @Get("conversations") history(@Ctx() ctx: RequestContext) { return this.mixdi.history(ctx); }

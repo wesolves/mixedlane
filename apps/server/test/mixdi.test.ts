@@ -223,6 +223,23 @@ describe("saved Mixdi conversations", () => {
 });
 
 describe("Mixdi model tests", () => {
+  it("discovers models with organization-scoped saved and unsaved keys without persisting changes", async () => {
+    const mock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ data: [{ id: "gpt-test" }] }));
+    const before = (await owner.api(org).get("/api/mixdi/settings").expect(200)).body;
+    await member.api(org).post("/api/mixdi/settings/models").send({ providerMode: "dedicated", provider: "openai", apiKey: "unsaved-key" }).expect(403);
+    await owner.api(org).post("/api/mixdi/settings/models").send({ providerMode: "dedicated", provider: "gemini" }).expect(400);
+    expect(mock).not.toHaveBeenCalled();
+    const saved = await owner.api(org).post("/api/mixdi/settings/models").send({ providerMode: "dedicated", provider: "openai" }).expect(200);
+    expect(saved.body).toEqual([{ id: "gpt-test", name: "gpt-test" }]);
+    expect(saved.headers["cache-control"]).toBe("no-store");
+    expect(mock.mock.calls[0][1]?.headers).toMatchObject({ authorization: "Bearer private-key" });
+    await owner.api(org).post("/api/mixdi/settings/models").send({ providerMode: "dedicated", provider: "openai", apiKey: "unsaved-key" }).expect(200);
+    expect(mock.mock.calls[1][1]?.headers).toMatchObject({ authorization: "Bearer unsaved-key" });
+    await owner.api(org).post("/api/mixdi/settings/models").send({ providerMode: "shared", provider: "openai", apiKey: "ignored-key" }).expect(200);
+    expect(mock.mock.calls[2][1]?.headers).toMatchObject({ authorization: "Bearer shared-key" });
+    expect((await owner.api(org).get("/api/mixdi/settings").expect(200)).body).toEqual(before);
+  });
+
   it("requires admin access and leaves settings, history and tickets unchanged", async () => {
     const mock = provider({ message: "Mixdi is ready", draft: null });
     await member.api(org).post("/api/mixdi/settings/test").send({ providerMode: "dedicated", provider: "openai" }).expect(403);

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AI_PROVIDERS, ticketDraftSchema, canHaveParent, type TicketDraft } from "@mixedlane/shared";
 import type { projects, workItems } from "../../core/database/schema";
 import { diagnostics, httpFailure, providerCode, ProviderFailure, TriageFailure, type FailureCategory } from "./ai-diagnostics";
+import { anthropicHeaders, anthropicText } from "../ai/anthropic";
 
 export type ProviderConfig = Partial<Record<typeof AI_PROVIDERS[number], { model: string; apiKey: string; url?: string }>>;
 export interface TriageInput {
@@ -62,6 +63,10 @@ Check existing items for duplicates. Return ONLY JSON with keys: type, title, de
         url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
         headers = { "x-goog-api-key": apiKey };
         body = { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };
+      } else if (provider === "anthropic") {
+        url = "https://api.anthropic.com/v1/messages";
+        headers = anthropicHeaders(apiKey);
+        body = { model, system, max_tokens: 4096, messages: [{ role: "user", content: prompt }] };
       } else {
         url = provider === "custom" ? customUrl! : provider === "openai" ? "https://api.openai.com/v1/chat/completions" : "https://api.x.ai/v1/chat/completions";
         headers = { authorization: `Bearer ${apiKey}` };
@@ -74,7 +79,7 @@ Check existing items for duplicates. Return ONLY JSON with keys: type, title, de
       }
       stage = "output";
       const data = await res.json() as any;
-      const content = provider === "ollama" ? data.message?.content : provider === "gemini" ? data.candidates?.[0]?.content?.parts?.filter((p: any) => !p.thought).map((p: any) => p.text ?? "").join("") : data.choices?.[0]?.message?.content;
+      const content = provider === "anthropic" ? anthropicText(data) : provider === "ollama" ? data.message?.content : provider === "gemini" ? data.candidates?.[0]?.content?.parts?.filter((p: any) => !p.thought).map((p: any) => p.text ?? "").join("") : data.choices?.[0]?.message?.content;
       if (typeof content !== "string") throw new Error(`${provider} returned no text`);
       const proposal = validateProposal(JSON.parse(content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "")), input);
       log.record("attempt_succeeded", { ...fields, durationMs: Date.now() - started, status: res.status });

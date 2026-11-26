@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { ITEM_TYPES, PRIORITIES } from "./hierarchy";
 
-export const AI_PROVIDERS = ["ollama", "gemini", "grok", "openai", "custom"] as const;
+export const MODEL_PROVIDERS = ["ollama", "gemini", "grok", "openai", "anthropic"] as const;
+export const AI_PROVIDERS = [...MODEL_PROVIDERS, "custom"] as const;
+export const aiModelListSchema = z.object({ provider: z.enum(MODEL_PROVIDERS), apiKey: z.string().trim().max(1000).optional() });
+export type AiModelListInput = z.infer<typeof aiModelListSchema>;
+export interface AiModelOption { id: string; name: string }
 const httpUrl = z.string().url().refine((v) => { const u = new URL(v); return ["http:", "https:"].includes(u.protocol) && !u.username && !u.password && !u.search && !u.hash; }, "Use an HTTP(S) URL without credentials, query, or fragment");
 const providerSchema = z.object({ model: z.string().trim().max(120).regex(/^[a-zA-Z0-9._:/-]*$/), apiKey: z.string().max(1000).optional() });
 export const whatsappSettingsSchema = z.object({
@@ -12,6 +16,7 @@ export const whatsappSettingsSchema = z.object({
   askProjectEveryTime: z.boolean().default(true),
   providers: z.object({ ollama: providerSchema, gemini: providerSchema, grok: providerSchema,
     openai: providerSchema.default({ model: "" }),
+    anthropic: providerSchema.default({ model: "" }),
     custom: providerSchema.extend({ url: z.union([z.literal(""), httpUrl]).optional() }).default({ model: "" }),
   }),
 });

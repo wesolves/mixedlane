@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Module, Param, Post, Put, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Headers, HttpCode, Module, Param, Post, Put, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import type { Request } from "express";
 import { z } from "zod";
-import { itemCreateSchema, whatsappSettingsSchema, type ItemCreate, type WhatsappSettingsInput } from "@mixedlane/shared";
+import { aiModelListSchema, itemCreateSchema, whatsappSettingsSchema, type AiModelListInput, type ItemCreate, type WhatsappSettingsInput } from "@mixedlane/shared";
 import { Ctx, Public, type RequestContext } from "../../core/context";
 import { ZodPipe } from "../../core/http";
 import { requireOrg } from "../access/access.service";
@@ -23,6 +23,10 @@ export class WhatsappController {
   settings(@Ctx() ctx: RequestContext) { requireOrg(ctx, "integration.manage"); return this.wa.settings(ctx.orgId); }
   @Put("settings")
   save(@Ctx() ctx: RequestContext, @Body(new ZodPipe(whatsappSettingsSchema)) body: WhatsappSettingsInput) { return this.wa.save(ctx, body); }
+  @Post("settings/models")
+  @HttpCode(200)
+  @Header("Cache-Control", "no-store")
+  models(@Ctx() ctx: RequestContext, @Body(new ZodPipe(aiModelListSchema)) body: AiModelListInput) { return this.wa.models(ctx, body); }
   @Get("sessions")
   sessions(@Ctx() ctx: RequestContext) { return this.wa.listSessions(ctx); }
   @Post("sessions")

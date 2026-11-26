@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
-import { AI_PROVIDERS, type ItemCreate, type WhatsappSettingsInput, type WhatsappSettingsInfo } from "@mixedlane/shared";
+import { AI_PROVIDERS, type AiModelListInput, type ItemCreate, type WhatsappSettingsInput, type WhatsappSettingsInfo } from "@mixedlane/shared";
 import { DB, type Db } from "../../core/database/database";
 import { whatsappConnections as connections, whatsappSessions as sessions, whatsappContacts as contacts, whatsappDrafts as drafts, whatsappEvents as events, projects, workItems } from "../../core/database/schema";
 import type { RequestContext } from "../../core/context";
@@ -18,6 +18,7 @@ import { triage, validateProposal, type ProviderConfig } from "./triage";
 import { TriageFailure } from "./ai-diagnostics";
 import { whatsappBootstrap } from "./bootstrap";
 import { ticketText } from "./ticket-context";
+import { listProviderModels } from "../ai/models";
 
 type Draft = typeof drafts.$inferSelect;
 const scope = (orgId: string, id: string) => and(eq(drafts.orgId, orgId), eq(drafts.id, id));
@@ -48,6 +49,14 @@ export class WhatsappService {
       defaultProjectId: row?.defaultProjectId ?? null, askProjectEveryTime: row?.askProjectEveryTime ?? true,
       hasApiKey: !!row || !!bootstrap?.apiKey, providers: Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: providers?.[p]?.model ?? "", configured: !!providers?.[p]?.apiKey, ...(p === "custom" ? { url: providers?.[p]?.url ?? "" } : {}) }])) as WhatsappSettingsInfo["providers"] };
   }
+  async models(ctx: RequestContext, input: AiModelListInput) {
+    requireOrg(ctx, "integration.manage");
+    // A newly entered key does not require saving a model or contacting OpenWA first.
+    if (input.apiKey) return listProviderModels(input.provider, input.apiKey);
+    const [row] = await this.db.select().from(connections).where(eq(connections.orgId, ctx.orgId));
+    const providers: ProviderConfig = row ? JSON.parse(decrypt(row.providersEnc)) : whatsappBootstrap()?.providers ?? {};
+    return listProviderModels(input.provider, providers[input.provider]?.apiKey);
+  }
   async save(ctx: RequestContext, input: WhatsappSettingsInput) {
     requireOrg(ctx, "integration.manage");
     if (input.defaultProjectId) await this.access.project(ctx, input.defaultProjectId, "item.create");
@@ -63,8 +72,11 @@ export class WhatsappService {
       const linked = await this.db.select().from(sessions).where(eq(sessions.orgId, ctx.orgId));
       if (linked.length) throw new AppError(409, "Remove connected accounts before changing gateway or callback URL");
     }
-    await new OpenWaClient(input.baseUrl, apiKey).call("/sessions");
-    const providers = Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: input.providers[p].model, apiKey: input.providers[p].apiKey ?? previous?.[p]?.apiKey ?? "", ...(p === "custom" ? { url: input.providers.custom.url ?? previous?.custom?.url ?? "" } : {}) }]));
+    // Provider and project preferences remain editable during a gateway outage.
+    if (!old || old.baseUrl !== input.baseUrl.replace(/\/$/, "") || apiKey !== decrypt(old.apiKeyEnc)) {
+      await new OpenWaClient(input.baseUrl, apiKey).call("/sessions");
+    }
+    const providers = Object.fromEntries(AI_PROVIDERS.map((p) => [p, { model: input.providers[p].model, apiKey: input.providers[p].apiKey || previous?.[p]?.apiKey || "", ...(p === "custom" ? { url: input.providers.custom.url ?? previous?.custom?.url ?? "" } : {}) }]));
     for (const p of AI_PROVIDERS) if (providers[p].apiKey && !providers[p].model) throw new AppError(400, `Choose a model for ${p}`);
     if (providers.custom.apiKey && !providers.custom.url) throw new AppError(400, "Enter a chat completions URL for the custom provider");
     const values = { defaultProjectId: input.defaultProjectId, askProjectEveryTime: input.askProjectEveryTime, baseUrl: input.baseUrl.replace(/\/$/, ""), callbackUrl: input.callbackUrl.replace(/\/$/, ""), apiKeyEnc: encrypt(apiKey), providersEnc: encrypt(JSON.stringify(providers)), webhookSecret: old?.webhookSecret ?? randomSecret() };
@@ -82,7 +94,14 @@ export class WhatsappService {
     const local = await this.db.select().from(sessions).where(eq(sessions.orgId, ctx.orgId));
     if (!local.length) return [];
     const client = await this.client(ctx.orgId);
-    return Promise.all(local.map(async (s) => ({ ...(await client.call(`/sessions/${s.id}`)), id: s.id, defaultProjectId: s.defaultProjectId })));
+    return Promise.all(local.map(async (s) => {
+      try {
+        return { ...(await client.call(`/sessions/${s.id}`)), id: s.id, defaultProjectId: s.defaultProjectId };
+      } catch (error) {
+        if (!(error instanceof AppError)) throw error;
+        return { id: s.id, name: s.name, status: "unavailable", defaultProjectId: s.defaultProjectId, lastError: error.message };
+      }
+    }));
   }
   async createSession(ctx: RequestContext, name: string) {
     requireOrg(ctx, "integration.manage");
