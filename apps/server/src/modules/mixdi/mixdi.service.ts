@@ -18,6 +18,7 @@ import { runMixdi } from "./workflow";
 import { invokeMixdiProvider, MixdiProviderError } from "./provider";
 import { listProviderModels } from "../ai/models";
 import { resolveProviderConfig } from "../ai/provider-config";
+import { diagnostics } from "../whatsapp/ai-diagnostics";
 
 const defaults = { enabled: false, providerMode: "shared" as const, userIds: [] as string[], createTickets: false, createDocuments: false, projectIds: [] as string[], spaceIds: [] as string[] };
 @Injectable()
@@ -143,7 +144,33 @@ export class MixdiService {
     if (!deleted.length) throw new AppError(404, "Conversation not found.");
   }
   async chat(ctx: RequestContext, input: MixdiChat) {
+    const started = Date.now();
+    const secrets: string[] = [];
+    const log = diagnostics({ orgId: ctx.orgId, operation: "mixdi_chat" }, secrets);
+    let stage = "authorization";
+    const trace = (next: string) => { stage = next; log.record("stage_started", { stage }); };
+    log.record("started");
+    try {
+      const result = await this.chatRequest(ctx, input, log, secrets, trace);
+      log.record("completed", { durationMs: Date.now() - started });
+      return result;
+    } catch (error) {
+      if (error instanceof AppError && error.status < 500) {
+        log.record("rejected", { stage, status: error.status, durationMs: Date.now() - started });
+        throw error;
+      }
+      // SQL text, exception messages and provider responses may contain private content.
+      const codes = ["42P01", "42703", "23505", "23503", "08006", "57P01"];
+      const code = (error as { code?: unknown; cause?: { code?: unknown } } | null)?.cause?.code ?? (error as { code?: unknown } | null)?.code;
+      const status = error instanceof AppError ? error.status : 500;
+      log.record("failed", { stage, status, category: "backend", durationMs: Date.now() - started, ...(typeof code === "string" && codes.includes(code) ? { code } : {}) });
+      throw new AppError(status, `${error instanceof AppError ? error.message : "Mixdi encountered a backend error. Ask an admin to check the API logs."} Reference: ${log.reference}`);
+    }
+  }
+  private async chatRequest(ctx: RequestContext, input: MixdiChat, log: ReturnType<typeof diagnostics>, secrets: string[], trace: (stage: string) => void) {
+    trace("authorization");
     const context = await this.authorize(ctx, input);
+    trace("conversation");
     const conversation = input.conversationId ? await this.loadConversation(ctx, input.conversationId) : undefined;
     if (conversation && (conversation.context.kind !== input.kind || conversation.context.destination !== input.destination || conversation.context.parentId !== input.parentId)) throw new AppError(400, "Start a new chat to change its destination or parent.");
     const messages = conversation ? [...conversation.messages, input.messages.at(-1)!] : input.messages;
@@ -155,12 +182,19 @@ export class MixdiService {
       if (!previous || previous.result || previous.request.kind !== input.kind || previous.request.destination !== input.destination || previous.request.parentId !== input.parentId) throw new AppError(400, "Choose a pending draft from this conversation's destination.");
       previousDraft = previous.draft;
     }
-    const row = (await this.config(ctx.orgId))!;
+    trace("configuration");
+    const row = await this.config(ctx.orgId);
+    if (!row) throw new AppError(503, "Mixdi settings are no longer available. Ask an admin to configure Mixdi.");
+    log.record("configuration_loaded", { stage: "configuration", providerMode: row.settings.providerMode });
     const providers = row.settings.providerMode === "shared" ? await this.sharedProviders(ctx.orgId) : JSON.parse(decrypt(row.providersEnc));
+    secrets.push(...Object.values(providers as ProviderConfig).map((provider) => provider?.apiKey ?? ""));
     const providerOrder = row.settings.providerMode === "shared" ? await this.sharedProviderOrder(ctx.orgId) : normalizeProviderOrder(row.settings.providerOrder);
-    const reply = await runMixdi({ ...input, messages: messages.slice(-29) }, { ...context, previousDraft }, providers, providerOrder);
+    trace("workflow");
+    const reply = await runMixdi({ ...input, messages: messages.slice(-29) }, { ...context, previousDraft }, providers, providerOrder, log);
+    trace("permissions_recheck");
     await this.authorize(ctx, input); // Permissions may change during provider latency.
     if (reply.draft && input.kind === "ticket" && "enabledTypes" in context && !context.enabledTypes?.includes(reply.draft.type)) throw new AppError(400, "Mixdi selected an invalid ticket type. Choose a valid parent or refine your request.");
+    trace("persistence");
     return this.db.transaction(async (tx) => {
       const request = { kind: input.kind, destination: input.destination, parentId: input.parentId };
       const [draft] = reply.draft ? await tx.insert(mixdiDrafts).values({ orgId: ctx.orgId, userId: ctx.userId!, request, draft: reply.draft }).returning() : [];

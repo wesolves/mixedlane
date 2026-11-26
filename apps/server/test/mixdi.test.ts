@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, afterEach, describe, expect, it, vi } from "vitest";
 import { AI_PROVIDERS } from "@mixedlane/shared";
+import { Logger } from "@nestjs/common";
 import { bootApp, invite, signUp, type TestApp, type TestUser } from "./harness";
 
 let ctx: TestApp, owner: TestUser, member: TestUser, org: string;
@@ -94,6 +95,40 @@ describe("Mixdi conversation and creation", () => {
     mock.mockResolvedValue(new Response(JSON.stringify({ error: "private-key secret prompt" }), { status: 401 }));
     const failed = await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(502);
     expect(JSON.stringify(failed.body)).not.toContain("private-key");
+  });
+  it("correlates immediate persistence failures without exposing SQL, messages or keys", async () => {
+    const { DB } = await import("../src/core/database/database");
+    const records: any[] = [];
+    for (const method of ["log", "warn"] as const) vi.spyOn(Logger.prototype, method).mockImplementation((message) => {
+      if (typeof message === "string" && message.startsWith('{"event":"ai.')) records.push(JSON.parse(message));
+    });
+    provider({ message: "Ready", draft: null });
+    const db = ctx.moduleRef.get(DB);
+    vi.spyOn(db, "transaction").mockRejectedValueOnce(Object.assign(new Error("PRIVATE SQL private-key customer-message"), { cause: { code: "42P01" } }));
+    const response = await owner.api(org).post("/api/mixdi/chat").send(prompt("ticket", project.id, "customer-message")).expect(500);
+    expect(response.body.error).toMatch(/backend error.*Reference: [0-9a-f-]{36}/);
+    const failed = records.find((record) => record.event === "ai.failed");
+    expect(failed).toMatchObject({ operation: "mixdi_chat", stage: "persistence", category: "backend", status: 500, code: "42P01" });
+    expect(records.find((record) => record.event === "ai.configuration_loaded")).toMatchObject({ providerMode: "dedicated" });
+    expect(response.body.error).toContain(failed.reference);
+    expect(records.some((record) => record.event === "ai.attempt_succeeded" && record.reference === failed.reference && record.provider === "openai")).toBe(true);
+    expect(new Set(records.map((record) => record.reference)).size).toBe(1);
+    expect(JSON.stringify({ records, response: response.body })).not.toMatch(/PRIVATE SQL|private-key|customer-message/);
+  });
+
+  it("returns provider failure guidance and a correlated reference instead of losing the cause", async () => {
+    const records: any[] = [];
+    for (const method of ["log", "warn"] as const) vi.spyOn(Logger.prototype, method).mockImplementation((message) => {
+      if (typeof message === "string" && message.startsWith('{"event":"ai.')) records.push(JSON.parse(message));
+    });
+    const mock = provider({ message: "Ready", draft: null });
+    mock.mockResolvedValue(Response.json({ error: { message: "private-key customer-message" } }, { status: 401 }));
+    const response = await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(502);
+    expect(response.body.error).toContain("API key");
+    expect(response.body.error).toContain("Reference:");
+    expect(records.find((record) => record.event === "ai.attempt_failed")).toMatchObject({ operation: "mixdi_chat", provider: "openai", category: "credentials", status: 401 });
+    expect(records.find((record) => record.event === "ai.failed")).toMatchObject({ stage: "workflow" });
+    expect(JSON.stringify({ records, response: response.body })).not.toMatch(/private-key|customer-message/);
   });
   it("uses the existing shared providers when selected", async () => {
     const { DB } = await import("../src/core/database/database");

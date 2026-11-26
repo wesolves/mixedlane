@@ -32,12 +32,12 @@ export function providerCode(value: unknown): string | undefined {
   return typeof value === "string" && ["model_not_found", "invalid_model", "invalid_api_key", "insufficient_quota", "rate_limit_exceeded", "permission_denied", "invalid_request_error"].includes(value) ? value : undefined;
 }
 const logger = new Logger("AIIntegration");
-export function diagnostics(context: { orgId: string; draftId?: string }, secrets: string[]) {
+export function diagnostics(context: { orgId: string; draftId?: string; operation?: "ticket_triage" | "mixdi_chat" }, secrets: string[]) {
   const reference = randomUUID();
   const safe = (s: string) => secrets.filter(Boolean).reduce((text, secret) => text.split(secret).join("[redacted]"), s).replace(/[\r\n\x00-\x1f]/g, " ").slice(0, 160);
   return {
     reference,
-    record(event: string, fields: { provider?: string; model?: string; attempt?: number; durationMs?: number; category?: FailureCategory; status?: number; code?: string; detail?: string }) {
+    record(event: string, fields: { stage?: string; providerMode?: "shared" | "dedicated"; provider?: string; model?: string; attempt?: number; durationMs?: number; category?: FailureCategory | "backend"; status?: number; code?: string; detail?: string } = {}) {
       const entry = JSON.stringify({ event: `ai.${event}`, timestamp: new Date().toISOString(), operation: "ticket_triage", reference, ...context, ...fields, ...(fields.model ? { model: safe(fields.model) } : {}) });
       if (fields.category) logger.warn(entry); else logger.log(entry);
     },
