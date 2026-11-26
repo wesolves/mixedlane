@@ -13,7 +13,7 @@ import type { ZodSchema } from "zod";
 /** Domain errors thrown by services; mapped to HTTP by the filter below. */
 export class AppError extends Error {
   constructor(
-    public status: 400 | 401 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 501 | 502 | 503,
+    public status: 400 | 401 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 500 | 501 | 502 | 503,
     message: string,
   ) {
     super(message);
