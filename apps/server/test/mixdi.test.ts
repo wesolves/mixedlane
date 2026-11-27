@@ -257,6 +257,89 @@ describe("saved Mixdi conversations", () => {
   });
 });
 
+describe("Mixdi ticket editing", () => {
+  it("allows only one of two concurrent draft edits and honors creation claims", async () => {
+    provider(answer);
+    const first = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    const base = `/api/mixdi/conversations/${first.conversationId}`;
+    const before = (await owner.api(org).get(base)).body;
+    const edits = await Promise.all(["Window one", "Window two"].map((title) => owner.api(org).put(base + "/draft").send({ version: before.version, draft: { ...answer.draft, title } })));
+    expect(edits.map((r) => r.status).sort()).toEqual([200, 409]);
+    const saved = (await owner.api(org).get(base)).body;
+    expect(saved.reply.draft.title).toBe(edits.find((r) => r.status === 200)!.body.reply.draft.title);
+    const { DB } = await import("../src/core/database/database");
+    const { mixdiDrafts } = await import("../src/core/database/schema");
+    const { eq } = await import("drizzle-orm");
+    const db = ctx.moduleRef.get(DB);
+    await db.update(mixdiDrafts).set({ status: "creation-claim", claimedAt: new Date() }).where(eq(mixdiDrafts.id, first.draftId));
+    await owner.api(org).put(base + "/draft").send({ version: saved.version, draft: answer.draft }).expect(409);
+    expect((await owner.api(org).get(base)).body.version).toBe(saved.version);
+  });
+  it("rejects edits when project access is revoked after creation", async () => {
+    provider(answer);
+    await owner.api(org).post(`/api/projects/${project.id}/access`).send({ principalType: "user", principalId: member.id, role: "editor" }).expect(200);
+    const first = (await member.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    await member.api(org).post(`/api/mixdi/drafts/${first.draftId}/create`).expect(201);
+    const url = `/api/mixdi/conversations/${first.conversationId}/ticket`;
+    const before = (await member.api(org).get(url).expect(200)).body;
+    await owner.api(org).post(`/api/projects/${project.id}/access`).send({ principalType: "user", principalId: member.id, role: "viewer" }).expect(200);
+    try {
+      await member.api(org).put(url).send({ description: "Forbidden", updatedAt: before.updatedAt }).expect(403);
+    } finally {
+      await owner.api(org).post(`/api/projects/${project.id}/access`).send({ principalType: "user", principalId: member.id, role: "editor" }).expect(200);
+    }
+  });
+  it("persists draft edits, rejects stale versions and creates the edited ticket", async () => {
+    provider(answer);
+    const first = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    const url = `/api/mixdi/conversations/${first.conversationId}`;
+    const before = (await owner.api(org).get(url).expect(200)).body;
+    const draft = { ...answer.draft, title: "Edited login", description: "## Revised\n- [ ] Accessible login", priority: "high" };
+    await member.api(org).put(url + "/draft").send({ version: before.version, draft }).expect(404);
+    await owner.api(org).put(url + "/draft").send({ version: before.version, draft: { ...draft, type: "epic" } }).expect(400);
+    await owner.api(org).put(url + "/draft").send({ version: before.version, draft: { ...draft, title: " " } }).expect(400);
+    const saved = (await owner.api(org).put(url + "/draft").send({ version: before.version, draft }).expect(200)).body;
+    expect(saved.reply.draft).toEqual(draft);
+    await owner.api(org).put(url + "/draft").send({ version: before.version, draft: answer.draft }).expect(409);
+    expect((await owner.api(org).get(url)).body.reply.draft).toEqual(draft);
+    const created = (await owner.api(org).post(`/api/mixdi/drafts/${first.draftId}/create`).expect(201)).body;
+    const item = (await owner.api(org).get(`/api/items/by-key/${created.url.split("/").at(-1)}`).expect(200)).body;
+    expect(item).toMatchObject(draft);
+    await owner.api(org).put(url + "/draft").send({ version: saved.version, draft }).expect(409);
+  });
+  it("loads live created descriptions, preserves other fields and rejects stale or foreign edits", async () => {
+    provider(answer);
+    const first = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    const url = `/api/mixdi/conversations/${first.conversationId}/ticket`;
+    await owner.api(org).get(url).expect(404);
+    const created = (await owner.api(org).post(`/api/mixdi/drafts/${first.draftId}/create`).expect(201)).body;
+    const before = (await owner.api(org).get(url).expect(200)).body;
+    expect(before).toMatchObject({ description: answer.draft.description, canEdit: true });
+    await member.api(org).get(url).expect(404);
+    await member.api(org).put(url).send({ description: "Forbidden", updatedAt: before.updatedAt }).expect(404);
+    await owner.api(org).put(url).send({ description: "Too long".repeat(30000), updatedAt: before.updatedAt }).expect(400);
+    await owner.api(org).put(url).send({ description: "bad date", updatedAt: "invalid" }).expect(400);
+    const saved = (await owner.api(org).put(url).send({ description: "## Current\nUpdated manually", updatedAt: before.updatedAt, title: "Ignored" }).expect(200)).body;
+    expect(saved.description).toBe("## Current\nUpdated manually");
+    await owner.api(org).put(url).send({ description: "Stale", updatedAt: before.updatedAt }).expect(409);
+    const item = (await owner.api(org).get(`/api/items/by-key/${created.url.split("/").at(-1)}`).expect(200)).body;
+    expect(item).toMatchObject({ title: answer.draft.title, description: saved.description, priority: answer.draft.priority });
+    await owner.api(org).put(url).send({ description: "", updatedAt: saved.updatedAt }).expect(200);
+    expect((await owner.api(org).get(url)).body.description).toBe("");
+  });
+  it("rechecks Mixdi grants for draft and created ticket editing", async () => {
+    provider(answer);
+    const first = (await owner.api(org).post("/api/mixdi/chat").send(prompt()).expect(201)).body;
+    const base = `/api/mixdi/conversations/${first.conversationId}`;
+    const before = (await owner.api(org).get(base)).body;
+    await owner.api(org).put("/api/mixdi/settings").send({ ...settings, userIds: [member.id] }).expect(200);
+    try {
+      await owner.api(org).put(base + "/draft").send({ version: before.version, draft: answer.draft }).expect(403);
+      await owner.api(org).get(base + "/ticket").expect(403);
+    } finally { await owner.api(org).put("/api/mixdi/settings").send(settings).expect(200); }
+  });
+});
+
 describe("Mixdi model tests", () => {
   it("applies saved integration OpenAI to actual chat without overwriting dedicated credentials or access", async () => {
     const { DB } = await import("../src/core/database/database");

@@ -46,6 +46,17 @@ export const mixdiReplySchema = z.object({
   message: z.string().min(1).max(4000),
   draft: mixdiDraftSchema.nullable(),
 });
+export const mixdiEditDraftSchema = z.object({
+  version: z.number().int().nonnegative(),
+  draft: mixdiDraftSchema,
+});
+export type MixdiEditDraft = z.infer<typeof mixdiEditDraftSchema>;
+export const mixdiEditTicketSchema = z.object({
+  description: z.string().max(200000),
+  updatedAt: z.string().datetime(),
+});
+export type MixdiEditTicket = z.infer<typeof mixdiEditTicketSchema>;
+export interface MixdiTicket { title: string; description: string; updatedAt: string; canEdit: boolean }
 export const mixdiChatSchema = z.object({
   kind: z.enum(["ticket", "document"]),
   destination: z.string().uuid(),
@@ -60,6 +71,7 @@ export interface MixdiConversationSummary {
   id: string; title: string; kind: "ticket" | "document"; destination: string; parentId: string | null; updatedAt: string;
 }
 export interface MixdiConversation extends MixdiConversationSummary {
+  version: number;
   messages: MixdiChat["messages"]; reply: MixdiReply | null; result: MixdiResult | null;
 }
 export interface MixdiResult { url: string; title: string }

@@ -90,6 +90,9 @@ export type ProjectWithAccess = Project & { access: ProjectAccessInfo };
 
 export const api = {
   mixdi: {
+    editDraft: (id: string, input: import("@mixedlane/shared").MixdiEditDraft) => request<import("@mixedlane/shared").MixdiConversation>(`/mixdi/conversations/${id}/draft`, json("PUT", input)),
+    ticket: (id: string) => request<import("@mixedlane/shared").MixdiTicket>(`/mixdi/conversations/${id}/ticket`),
+    editTicket: (id: string, input: import("@mixedlane/shared").MixdiEditTicket) => request<import("@mixedlane/shared").MixdiTicket>(`/mixdi/conversations/${id}/ticket`, json("PUT", input)),
     setProviderSource: (input: import("@mixedlane/shared").MixdiProviderSourceInput) => request<import("@mixedlane/shared").MixdiSettings>("/mixdi/settings/provider-source", json("PUT", input)),
     models: (input: import("@mixedlane/shared").MixdiModelListInput, signal?: AbortSignal) => request<import("@mixedlane/shared").AiModelOption[]>("/mixdi/settings/models", { ...json("POST", input), signal }),
     testModels: (input: import("@mixedlane/shared").MixdiModelTestInput) => request<import("@mixedlane/shared").MixdiModelTestResult[]>("/mixdi/settings/test", json("POST", input)),
