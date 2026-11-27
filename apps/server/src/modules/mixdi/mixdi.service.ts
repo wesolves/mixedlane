@@ -19,6 +19,7 @@ import { invokeMixdiProvider, MixdiProviderError } from "./provider";
 import { listProviderModels } from "../ai/models";
 import { resolveProviderConfig } from "../ai/provider-config";
 import { diagnostics } from "../whatsapp/ai-diagnostics";
+import type { MixdiEditDraft, MixdiEditTicket } from "@mixedlane/shared";
 
 const defaults = { enabled: false, providerMode: "shared" as const, userIds: [] as string[], createTickets: false, createDocuments: false, projectIds: [] as string[], spaceIds: [] as string[] };
 @Injectable()
@@ -149,7 +150,48 @@ export class MixdiService {
   async conversation(ctx: RequestContext, id: string) {
     const row = await this.loadConversation(ctx, id);
     const [draft] = row.draftId ? await this.db.select().from(mixdiDrafts).where(and(eq(mixdiDrafts.id, row.draftId), eq(mixdiDrafts.orgId, ctx.orgId), eq(mixdiDrafts.userId, ctx.userId!))) : [];
-    return { id: row.id, title: row.title, ...row.context, updatedAt: row.updatedAt.toISOString(), messages: row.messages, reply: draft ? { message: row.messages.at(-1)?.content ?? "", draft: draft.draft, draftId: draft.id, conversationId: row.id } : null, result: draft?.result ?? null };
+    return { id: row.id, version: row.version, title: row.title, ...row.context, updatedAt: row.updatedAt.toISOString(), messages: row.messages, reply: draft ? { message: row.messages.at(-1)?.content ?? "", draft: draft.draft, draftId: draft.id, conversationId: row.id } : null, result: draft?.result ?? null };
+  }
+  async editDraft(ctx: RequestContext, id: string, input: MixdiEditDraft) {
+    const row = await this.loadConversation(ctx, id);
+    const context = await this.authorize(ctx, row.context);
+    if (row.context.kind !== "ticket" || !row.draftId) throw new AppError(400, "Choose a ticket draft.");
+    if (!("enabledTypes" in context) || !context.enabledTypes?.includes(input.draft.type)) throw new AppError(400, "Choose a valid ticket type for this parent.");
+    await this.db.transaction(async (tx) => {
+      const changed = await tx.update(mixdiConversations).set({ version: input.version + 1, updatedAt: new Date() }).where(and(this.conversationScope(ctx, id), eq(mixdiConversations.version, input.version), eq(mixdiConversations.draftId, row.draftId!))).returning();
+      if (!changed.length) throw new AppError(409, "This chat changed. Reopen it before editing again.");
+      const saved = await tx.update(mixdiDrafts).set({ draft: input.draft, createdAt: new Date() }).where(and(eq(mixdiDrafts.id, row.draftId!), eq(mixdiDrafts.orgId, ctx.orgId), eq(mixdiDrafts.userId, ctx.userId!), eq(mixdiDrafts.status, "pending"), isNull(mixdiDrafts.result))).returning();
+      if (!saved.length) throw new AppError(409, "This draft is being created or has already been created. Reopen the chat.");
+    });
+    return this.conversation(ctx, id);
+  }
+  private async createdTicket(ctx: RequestContext, id: string) {
+    const row = await this.loadConversation(ctx, id);
+    if (row.context.kind !== "ticket" || !row.draftId) throw new AppError(400, "Choose a created ticket conversation.");
+    const [draft] = await this.db.select().from(mixdiDrafts).where(and(eq(mixdiDrafts.id, row.draftId), eq(mixdiDrafts.orgId, ctx.orgId), eq(mixdiDrafts.userId, ctx.userId!)));
+    if (!draft?.result) throw new AppError(404, "This conversation has no created ticket.");
+    // Results saved before ticket editing store the stable work item key in their URL.
+    const key = draft.result.url.split("/").at(-1)!;
+    const itemId = await this.items.idByKey(ctx.orgId, key);
+    const { access } = await this.access.item(ctx, itemId, "project.read");
+    const item = await this.items.get(ctx.orgId, itemId);
+    if (item.projectId !== row.context.destination) throw new AppError(409, "This ticket moved. Open it from its project to edit it.");
+    return { item, access };
+  }
+  async ticket(ctx: RequestContext, id: string) {
+    const { item, access } = await this.createdTicket(ctx, id);
+    return { title: item.title, description: item.description, updatedAt: item.updatedAt.toISOString(), canEdit: access.permissions.includes("item.update") };
+  }
+  async editTicket(ctx: RequestContext, id: string, input: MixdiEditTicket) {
+    const { item } = await this.createdTicket(ctx, id);
+    await this.access.item(ctx, item.id, "item.update");
+    try {
+      await this.items.update(ctx.orgId, item.id, { description: input.description }, ctx.actor, { expectedUpdatedAt: new Date(input.updatedAt) });
+    } catch (error) {
+      if (error instanceof AppError && error.status === 409) throw new AppError(409, "This ticket changed. Reload its current description before saving again.");
+      throw error;
+    }
+    return this.ticket(ctx, id);
   }
   async removeConversation(ctx: RequestContext, id: string) {
     // Users may remove their own history even after destination access is revoked.
@@ -237,7 +279,7 @@ export class MixdiService {
       if (kind === "ticket") {
         const { project } = await this.access.project(ctx, destination, "item.create");
         const item = await this.db.transaction(async (tx) => {
-          const item = await this.items.create(ctx.orgId, itemCreateSchema.parse({ ...draft.draft, projectId: destination, parentId }), ctx.actor, tx);
+          const item = await this.items.create(ctx.orgId, itemCreateSchema.parse({ ...claimed.draft, projectId: destination, parentId }), ctx.actor, tx);
           result = { title: item.title, url: `/${ctx.orgSlug}/projects/${project.key}/${item.type}/${item.key}` };
           const saved = await tx.update(mixdiDrafts).set({ status: "created", result }).where(and(scope, eq(mixdiDrafts.status, token))).returning();
           if (!saved.length) throw new AppError(409, "This creation attempt expired. Retry the draft.");

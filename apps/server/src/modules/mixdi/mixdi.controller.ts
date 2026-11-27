@@ -7,6 +7,7 @@ import { WorkModule } from "../work/work.module";
 import { DocsModule } from "../docs/docs.controller";
 import { MixdiService } from "./mixdi.service";
 import { mixdiProviderSourceSchema, type MixdiProviderSourceInput } from "@mixedlane/shared";
+import { mixdiEditDraftSchema, mixdiEditTicketSchema, type MixdiEditDraft, type MixdiEditTicket } from "@mixedlane/shared";
 
 @ApiTags("Mixdi")
 @ApiBearerAuth()
@@ -27,6 +28,9 @@ export class MixdiController {
   @Get("conversations") history(@Ctx() ctx: RequestContext) { return this.mixdi.history(ctx); }
   @Get("conversations/:id") conversation(@Ctx() ctx: RequestContext, @Param("id", ParseUUIDPipe) id: string) { return this.mixdi.conversation(ctx, id); }
   @Delete("conversations/:id") removeConversation(@Ctx() ctx: RequestContext, @Param("id", ParseUUIDPipe) id: string) { return this.mixdi.removeConversation(ctx, id); }
+  @Put("conversations/:id/draft") editDraft(@Ctx() ctx: RequestContext, @Param("id", ParseUUIDPipe) id: string, @ZBody(mixdiEditDraftSchema) body: MixdiEditDraft) { return this.mixdi.editDraft(ctx, id, body); }
+  @Get("conversations/:id/ticket") ticket(@Ctx() ctx: RequestContext, @Param("id", ParseUUIDPipe) id: string) { return this.mixdi.ticket(ctx, id); }
+  @Put("conversations/:id/ticket") editTicket(@Ctx() ctx: RequestContext, @Param("id", ParseUUIDPipe) id: string, @ZBody(mixdiEditTicketSchema) body: MixdiEditTicket) { return this.mixdi.editTicket(ctx, id, body); }
   @Post("drafts/:id/create") create(@Ctx() ctx: RequestContext, @Param("id", ParseUUIDPipe) id: string) { return this.mixdi.create(ctx, id); }
 }
 @Module({ imports: [WorkModule, DocsModule], controllers: [MixdiController], providers: [MixdiService] })
